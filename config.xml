@@ -1,0 +1,23 @@
+<configuration>
+    <database>
+        <type>QMYSQL</type>
+        <server>localhost</server>
+        <name>studMng</name>
+        <user>root</user>
+        <password/>
+        <delete_folder_content>true</delete_folder_content>
+        <backup_deleted_tables>true</backup_deleted_tables>
+    </database>
+    <spreadsheet>
+        <rows>600</rows>
+        <columns>6</columns>
+        <refresh_time>5</refresh_time>
+        <row_height>25</row_height>
+        <column_width>100</column_width>
+        <selection_mode>ExtendedSelection</selection_mode>
+    </spreadsheet>
+    <security>
+        <key>621ffdd4e90bf0122a99976b7ccfb032</key>
+        <algorithm>aes128</algorithm>
+    </security>
+</configuration>
