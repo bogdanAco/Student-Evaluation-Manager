@@ -3,6 +3,8 @@
 
 #include <QtGui>
 #include "Dialog.h"
+#include "TableDialog.h"
+#include "ConfigurationDialog.h"
 #include "DBManager.h"
 #include "CFGManager.h"
 
@@ -12,6 +14,7 @@ class MainWindow : public QMainWindow
 
 public:
     MainWindow(const QString& title);
+    void resetSize();
     ~MainWindow();
 private:
     //Initialization functions
@@ -30,38 +33,43 @@ private:
     CFGManager *config;
     //Menus
     QMenuBar *menuBar;
-    QMenu *file;
+    QMenu *table;
     QMenu *edit;
     QMenu *insert;
     //Toolbars
-    QToolBar *fileToolBar;
+    QToolBar *tableToolBar;
     QToolBar *editToolBar;
     QToolBar *formulaToolBar;
     QLineEdit *cellFormula;
-    //File actions
-    QList <QAction*> fileActions;
-    QAction *newFileAction;
-    QAction *openFileAction;
-    QAction *closeFileAction;
-    QAction *exportFileAction;
+    //Table actions
+    QList <QAction*> tableActions;
+    QAction *newTableAction;
+    QAction *openTableAction;
+    QAction *closeTableAction;
+    QAction *importTableAction;
+    QAction *exportTableAction;
     //Edit actions
     QList <QAction*> editActions;
     QAction *cutAction;
     QAction *copyAction;
     QAction *pasteAction;
     QAction *deleteAction;
+    QAction *addColumnAction;
+    QAction *removeColumnAction;
+    QAction *addRowAction;
+    QAction *configureAction;
     //Formula action
     QAction *formulaAction;
 private slots:
-    void newFile();
-    void createNewFile(const QString &name,
+    void newTable();
+    void createNewTable(const QString &name,
                        int columns, int rows);
-    void openFile();
-    void openNewFile(const QString &name,
+    void openTable();
+    void openNewTable(const QString &name,
                      int columns, int rows);
-    void closeFile();
-    void closeOpenedFile();
-    void exportFile();
+    void closeTable();
+    void closeOpenedTable();
+    void exportTable();
     void cut();
     void copy();
     void paste();
@@ -70,6 +78,13 @@ private slots:
     void showFormula(int row, int column);
     void setFormula();
     void logIn(int uid);
+    void addColumns();
+    void removeColumns();
+    void addRows();
+    void configureApp();
+    void importData();
+    void formula();
+    void resizeWindow(int cells);
 };
 
 #endif // MAINWINDOW_H

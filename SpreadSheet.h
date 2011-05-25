@@ -10,17 +10,17 @@ public:
     SpreadSheet(int rows = 600, int columns = 6, QWidget *parent = 0);
     ~SpreadSheet();
 
-    bool printSpreadSheet(const QString &fileName);
+    bool printSpreadSheet(const QString &fileName) const;
 
     QString currentLocation() const;
     QString getLocation(int row, int column) const;
     QString currentFormula() const;
     QTableWidgetSelectionRange selectedRange() const;
     QTimer *getTimer() const;
-    int getNonzeroRowCount(int column);
-    void replaceTimestamp(int index, const QString &newVal);
-    void addTimestamp(const QString &ts);
-    int timestampCount();
+    int getNonzeroRowCount(int column) const;
+    void replaceTimestamp(int index, const QString &newVal) const;
+    void addTimestamp(const QString &ts) const;
+    int timestampCount() const;
     QString getTimestamp(int index) const;
     void setCellsSize(const QSize &size);
     void setFormula(const QString &formula);
@@ -31,13 +31,13 @@ private:
     Cell* cell(int row,int column) const;
     QString text(int row, int column) const;
     QString formula(int row, int column) const;
-    void setFormula(int row, int column, const QString &formula);
-    QStringList *timestamps;
+    mutable QStringList *timestamps;
 
 signals:
     void modified(const QString &cellData);
 
 public slots:
+    void setFormula(int row, int column, const QString &formula);
     void cut();
     void copy();
     void paste();
@@ -46,6 +46,8 @@ public slots:
     void selectCurrentColumn();
     void findNext(const QString &str, Qt::CaseSensitivity cs);
     void findPrevious(const QString &str, Qt::CaseSensitivity cs);
+    void addColumns(int columns);
+    void addRows(int rows);
 
 private slots:
     void somethingChanged(QTableWidgetItem *cell);

@@ -4,37 +4,36 @@ Dialog::Dialog(const QString &title, const QString &text, QWidget* parent) :
         QDialog(parent)
 {
     setMinimumWidth(200);
-    layout = new QVBoxLayout(this);
-    buttons = new QHBoxLayout();
+    mainLayout = new QGridLayout(this);
     this->text = new QLabel(text,this);
     this->text->setWordWrap(true);
     setWindowTitle(title);
-    layout->addWidget(this->text);
-    layout->addStretch(1);
+    mainLayout->addWidget(this->text, 3, 0, 1, 4);
 
     result = new QLabel("",this);
     result->setStyleSheet("QLabel { color:red; }");
-    layout->addWidget(result, 0, Qt::AlignRight);
+    mainLayout->addWidget(result, 15, 0, 1, 4, Qt::AlignRight);
     ok = new QPushButton(style()->standardIcon(QStyle::SP_DialogOkButton),"Ok",this);
     ok->setFixedWidth(75);
-    buttons->addWidget(ok);
+    mainLayout->addWidget(ok, 16, 2, Qt::AlignRight);
     cancel = new QPushButton(style()->standardIcon(QStyle::SP_DialogCancelButton),
                              "Cancel",this);
     cancel->setFixedWidth(75);
     connect(cancel,SIGNAL(clicked()),this,SLOT(close()));
-    buttons->addWidget(cancel);
-    layout->addLayout(buttons);
-    layout->setAlignment(buttons, Qt::AlignRight);
+    mainLayout->addWidget(cancel, 16, 3, Qt::AlignRight);
 
     connect(ok, SIGNAL(clicked()), this, SLOT(emitOKSignal()));
+    connect(cancel, SIGNAL(clicked()), this, SLOT(emitCancelSignal()));
 }
 
 Dialog::~Dialog()
 {
     this->hide();
     delete text;
-    delete buttons;
-    delete layout;
+    delete result;
+    delete ok;
+    delete cancel;
+    delete mainLayout;
 }
 
 void Dialog::emitOKSignal()
@@ -42,16 +41,80 @@ void Dialog::emitOKSignal()
     emit okPressed();
 }
 
+void Dialog::emitCancelSignal()
+{
+    emit cancelPressed();
+}
+
+void Dialog::showMessage(const QString &msg)
+{
+    result->setText(msg);
+}
+
+CreateFolderDialog::CreateFolderDialog(QWidget *parent) :
+        Dialog("Create folder", "Create folder", parent)
+{
+    result->hide();
+    value = new QLineEdit();
+    mainLayout->addWidget(value, 4, 0, 1, 4);
+    disconnect(this);
+    connect(this, SIGNAL(okPressed()),
+            this, SLOT(emitSelected()));
+}
+
+CreateFolderDialog::~CreateFolderDialog()
+{
+    delete value;
+}
+
+void CreateFolderDialog::emitSelected()
+{
+    this->hide();
+    emit selected(value->text());
+}
+
+ModifyDialog::ModifyDialog(const QString &type, QWidget *parent) :
+        Dialog(type, QString("Modify spreadsheet:\n").append(type), parent)
+{
+    value = new QLineEdit("1");
+    mainLayout->addWidget(value, 4, 0, 1, 4);
+    connect(this, SIGNAL(okPressed()), this, SLOT(checkData()));
+}
+
+ModifyDialog::~ModifyDialog()
+{
+    delete value;
+}
+
+void ModifyDialog::checkData()
+{
+    bool ok = false;
+    int count = value->text().toInt(&ok);
+    if (!ok)
+    {
+        result->setText("Please enter a number");
+        return;
+    }
+    if (count == 0 || count > 10)
+    {
+        result->setText("Number must be between 1-10");
+        return;
+    }
+    this->hide();
+    emit dataChecked(count);
+}
+
 UserLoginDialog::UserLoginDialog(QWidget *parent) :
         Dialog("User login","Username",parent)
 {
     usrnm = new QLineEdit("admin", this);
-    layout->insertWidget(layout->indexOf(text)+1, usrnm);
+    mainLayout->addWidget(usrnm, 4, 0, 1, 4);
     password = new QLabel("Password:",this);
-    layout->insertWidget(layout->indexOf(usrnm)+1, password);
+    mainLayout->addWidget(password, 5, 0, 1, 4);
     passwd = new QLineEdit("admin", this);
     passwd->setEchoMode(QLineEdit::Password);
-    layout->insertWidget(layout->indexOf(password)+1, passwd);
+    mainLayout->addWidget(passwd, 6, 0, 1, 4);
+
 
     connect(this, SIGNAL(okPressed()), this, SLOT(checkData()));
 }
@@ -94,187 +157,211 @@ ErrorDialog::ErrorDialog(const QString& text, QWidget* parent) :
     connect(ok, SIGNAL(clicked()), this, SLOT(close()));
 }
 
-FileDialog::FileDialog(const QString &title, const QString &text,
-                       QWidget* parent) : Dialog(title, text, parent)
+ErrorDialog::~ErrorDialog()
 {
-    treeView = new QTreeWidget(this);
-    treeView->setColumnCount(1);
-    treeView->setHeaderLabel("Files");
-    layout->insertWidget(layout->indexOf(this->text)+1, treeView);
 
-    fileName = new QLineEdit();
-    fileName->setMaxLength(50);
-    layout->insertWidget(layout->indexOf(this->text)+1, fileName);
-
-    connect(this, SIGNAL(okPressed()), this, SLOT(checkValidity()));
 }
 
-void FileDialog::loadTreeData(const QMap<QString, QString> &files,
-                 const QMap<QString, QString> &folders)
+FormulaDialog::FormulaDialog(int currentRow, int currentCol,
+                             const SpreadSheet *spreadsheet,
+                             QWidget *parent) :
+        Dialog("Formula", "Select a function", parent)
 {
-    this->files = new QMap<QString, QString>(files);
-    this->folders = new QMap<QString, QString>(folders);
+    this->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    this->setFixedSize(220, 280);
+    this->spreadsheet = spreadsheet;
+    this->currentRow = currentRow;
+    this->currentColumn = currentCol;
 
-    QMap<QString, QString>::const_iterator i;
-    for (i = this->folders->begin(); i != this->folders->end(); i++)
+    mainLayout->removeWidget(text);
+    mainLayout->addWidget(text, 0, 0, 1, 4);
+
+    formula = new QComboBox();
+    formula->addItem("sum");
+    formula->addItem("avg");
+    formula->addItem("count");
+    formula->addItem("if");
+    formula->addItem("countif");
+    mainLayout->addWidget(formula, 1, 0, 1, 4);
+
+    formulaFormat = new QLabel();
+    formulaFormat->setStyleSheet("QLabel { font:bold; }");
+    formulaFormat->setWordWrap(true);
+    mainLayout->addWidget(formulaFormat, 2, 0, 1, 4);
+    formulaInfo = new QLabel();
+    formulaInfo->setWordWrap(true);
+    mainLayout->addWidget(formulaInfo, 3, 0, 3, 4);
+
+    rangeText = new QLabel("Enter or select the range:");
+    mainLayout->addWidget(rangeText,
+                          6, 0, 1, 4);
+    range = new QLineEdit();
+    mainLayout->addWidget(range, 7, 0, 1, 4);
+
+    conditionText = new QLabel("Condition");
+    conditionText->setDisabled(true);
+    mainLayout->addWidget(conditionText, 8, 0, 1, 4);
+
+    condition = new QLineEdit();
+    condition->setDisabled(true);
+    mainLayout->addWidget(condition, 9, 0, 1, 4);
+
+    thenText = new QLabel("Then value:");
+    mainLayout->addWidget(thenText, 10, 0, 1, 4);
+    thenValue = new QLineEdit();
+    mainLayout->addWidget(thenValue, 11, 0, 1, 4);
+
+    elseText = new QLabel("Else value:");
+    mainLayout->addWidget(elseText, 12, 0, 1, 4);
+    elseValue = new QLineEdit();
+    mainLayout->addWidget(elseValue, 13, 0, 1, 4);
+    hideThenElse();
+
+    showFormulaInfo("sum");
+    connect(formula, SIGNAL(currentIndexChanged(QString)),
+            this, SLOT(showFormulaInfo(QString)));
+    connect(this->spreadsheet, SIGNAL(itemSelectionChanged()),
+            this, SLOT(addRangeItems()));
+    connect(this, SIGNAL(okPressed()), this, SLOT(generateFormula()));
+    connect(this, SIGNAL(accepted()), spreadsheet, SLOT(clearSelection()));
+    connect(this, SIGNAL(cancelPressed()), spreadsheet, SLOT(clearSelection()));
+}
+
+FormulaDialog::~FormulaDialog()
+{
+    delete formula;
+    delete formulaInfo;
+    delete formulaFormat;
+    delete range;
+    delete conditionText;
+    delete condition;
+    delete thenText;
+    delete thenValue;
+    delete elseText;
+    delete elseValue;
+}
+
+void FormulaDialog::hideThenElse()
+{
+    thenText->hide();
+    thenValue->hide();
+    elseText->hide();
+    elseValue->hide();
+}
+
+void FormulaDialog::showThenElse()
+{
+    thenText->show();
+    thenValue->show();
+    elseText->show();
+    elseValue->show();
+}
+
+void FormulaDialog::showFormulaInfo(const QString &formula)
+{
+    hideThenElse();
+    this->setFixedSize(220, 280);
+    formulaFormat->setText("");
+    formulaInfo->setText("");
+    rangeText->setText("Enter or select the range:");
+    condition->setDisabled(true);
+    conditionText->setDisabled(true);
+
+    if (formula == "sum")
     {
-        QTreeWidgetItem *item = 0;
-        if (i.value() == "")
-            item = new QTreeWidgetItem(treeView);
-        else
+        formulaFormat->setText("sum(value1;value2;...;valueN)");
+        formulaInfo->setText("Adds all the numbers in the "
+                             "selected or entered range");
+    }
+    else if (formula == "avg")
+    {
+        formulaFormat->setText("avg(value1;value2;...;valueN)");
+        formulaInfo->setText("Returns the average value of "
+                             "the selected or entered range");
+    }
+    else if (formula == "count")
+    {
+        formulaFormat->setText("count(value1;value2;...;valueN)");
+        formulaInfo->setText("Counts the number of cells within "
+                             "the selected or entered range");
+    }
+    else if (formula == "if")
+    {
+        showThenElse();
+        this->setFixedSize(220, 380);
+        rangeText->setText("Cell:");
+        formulaFormat->setText("if(condition;then;else)");
+        formulaInfo->setText("If the condition is true, returns "
+                             "the first entered value, "
+                             "otherwise the second one.\n"
+                             "Else value is optional");
+        condition->setEnabled(true);
+        conditionText->setEnabled(true);
+    }
+    else if (formula == "countif")
+    {
+        formulaFormat->setText("countif(value1;...;valueN;condition)");
+        formulaInfo->setText("Counts the elements within the  "
+                             "selected or entered range, "
+                             "that satisfies the condition");
+        condition->setEnabled(true);
+        conditionText->setEnabled(true);
+    }
+}
+
+void FormulaDialog::addRangeItems()
+{
+    range->setText("");
+
+    if (formula->currentText() == "if")
+    {
+        range->setText(spreadsheet->currentLocation());
+        return;
+    }
+
+    QTableWidgetSelectionRange selected = spreadsheet->selectedRange();
+    for (int i=selected.topRow(); i<=selected.bottomRow(); i++)
+        for (int j=selected.leftColumn(); j<=selected.rightColumn(); j++)
+            range->setText(range->text().
+                           append(spreadsheet->getLocation(i, j)).
+                           append(";"));
+    range->setText(range->text().remove(range->text().length()-1, 1));
+}
+
+void FormulaDialog::generateFormula()
+{
+    if (formula->currentText() == "")
+        return;
+    if (condition->isEnabled())
+        if (condition->text() == "")
+            return;
+    if (range->text() == "")
+        return;
+
+    QString finalFormula = "=";
+    finalFormula.append(formula->currentText());
+    finalFormula.append("(");
+    if (formula->currentText() == "if")
+    {
+        finalFormula.append(range->text());
+        finalFormula.append(condition->text());
+        finalFormula.append(";");
+        finalFormula.append(thenValue->text());
+        if (elseValue->text() != "")
         {
-            QList<QTreeWidgetItem*> list = treeView->findItems(
-                                            i.value(), Qt::MatchExactly);
-            item = new QTreeWidgetItem(list[0]);
+            finalFormula.append(";");
+            finalFormula.append(elseValue->text());
         }
-        item->setIcon(0, QIcon("images/folder.png"));
-        item->setText(0, i.key());
-        item->setExpanded(true);
     }
-
-    for (i = this->files->begin(); i != this->files->end(); i++)
+    else
     {
-        QList<QTreeWidgetItem*> list = treeView->findItems(
-                                        i.value(), Qt::MatchExactly);
-        QTreeWidgetItem *item = new QTreeWidgetItem(list[0]);
-        item->setIcon(0, QIcon("images/new.png"));
-        item->setText(0, i.key());
+        finalFormula.append(range->text());
+        if (formula->currentText() == "countif")
+        {
+            finalFormula.append(";");
+            finalFormula.append(condition->text());
+        }
     }
-    treeView->sortItems(0, Qt::AscendingOrder);
-}
-
-void FileDialog::showSelectedItem()
-{
-    QString selectedItemName = treeView->selectedItems().at(0)->text(0);
-    if (isFile(selectedItemName))
-        fileName->setText(selectedItemName);
-}
-
-bool FileDialog::treeDataContains(const QString &string)
-{
-    if (files->contains(string))
-        return true;
-    if (folders->contains(string))
-        return true;
-    return false;
-}
-
-FileDialog::~FileDialog()
-{
-    delete treeView;
-    delete files;
-    delete folders;
-    delete fileName;
-}
-
-bool FileDialog::isFolder(const QString &nodeName)
-{
-    if (folders->contains(nodeName))
-        return true;
-    return false;
-}
-
-bool FileDialog::isFile(const QString &nodeName)
-{
-    if (files->contains(nodeName))
-        return true;
-    return false;
-}
-
-OpenFileDialog::OpenFileDialog(QWidget *parent) :
-        FileDialog("Open file", "Enter file name", parent)
-{
-    QLabel *label1 = new QLabel("Select the file:");
-    layout->insertWidget(layout->indexOf(fileName)+1, label1);
-    connect(treeView, SIGNAL(itemSelectionChanged()),
-            this, SLOT(showSelectedItem()));
-}
-
-void OpenFileDialog::checkValidity()
-{
-    result->setText("");
-    int len = fileName->text().length();
-    if (len == 0)
-    {
-        result->setText("No file name");
-        return;
-    }
-    if (isFolder(fileName->text()))
-    {
-        result->setText("No file selected");
-        return;
-    }
-    emit dataChecked(fileName->text(), 0, 0, "");
-    this->hide();
-}
-
-NewFileDialog::NewFileDialog(const CFGManager *cfg, QWidget *parent) :
-        FileDialog("New file", "Enter new file name", parent)
-{
-    QLabel *label1 = new QLabel("Select the folder:");
-    layout->insertWidget(layout->indexOf(fileName)+1, label1);
-
-    QGridLayout *gl = new QGridLayout();
-    QLabel *label2 = new QLabel("Columns:");
-    gl->addWidget(label2, 0, 0);
-    columnCount = new QLineEdit(QString("%1").arg(cfg->getColumnCount()));
-    columnCount->setMaxLength(2);
-    gl->addWidget(columnCount, 1, 0);
-    QLabel *label3 = new QLabel("Rows:");
-    gl->addWidget(label3, 0, 1);
-    rowCount = new QLineEdit(QString("%1").arg(cfg->getRowCount()));
-    rowCount->setMaxLength(4);
-    gl->addWidget(rowCount, 1, 1);
-    layout->insertLayout(layout->indexOf(fileName)+1, gl);
-    connect(treeView, SIGNAL(itemSelectionChanged()),
-            this, SLOT(showSelectedItem()));
-}
-
-NewFileDialog::~NewFileDialog()
-{
-    delete columnCount;
-    delete rowCount;
-}
-
-void NewFileDialog::checkValidity()
-{
-    result->setText("");
-    int len = fileName->text().length();
-    if (len == 0)
-    {
-        result->setText("No file name");
-        return;
-    }
-    if (treeView->selectedItems().length() == 0)
-    {
-        result->setText("No folder selected");
-        return;
-    }
-    if (isFile(treeView->selectedItems().at(0)->text(0)))
-    {
-        result->setText("Invalid folder selected");
-        return;
-    }
-    if (treeDataContains(fileName->text()))
-    {
-        result->setText("File name already exists");
-        return;
-    }
-    bool ok;
-    unsigned int cols = columnCount->text().toUInt(&ok);
-    if (!ok || (cols == 0))
-    {
-        result->setText("Invalid column number");
-        return;
-    }
-    unsigned int rows = rowCount->text().toUInt(&ok);
-    if (!ok || (rows == 0))
-    {
-        result->setText("Invalid row number");
-        return;
-    }
-
-    emit dataChecked(fileName->text(), cols, rows,
-                     treeView->selectedItems()[0]->text(0));
-    this->hide();
+    finalFormula.append(")");
+    emit setFormula(currentRow, currentColumn, finalFormula);
 }

@@ -3,6 +3,7 @@
 
 #include <QtGui>
 #include "CFGManager.h"
+#include "SpreadSheet.h"
 
 #define OPEN_FILE
 #define NEW_FILE
@@ -14,17 +15,56 @@ public:
     Dialog(const QString& title, const QString& text,
            QWidget* parent = 0);
     ~Dialog();
+
 protected:
-    QVBoxLayout *layout;
-    QHBoxLayout *buttons;
+    QGridLayout *mainLayout;
     QLabel *text;
     QLabel *result;
     QPushButton *ok;
     QPushButton *cancel;
+
 signals:
     void okPressed();
+    void cancelPressed();
+
 private slots:
     void emitOKSignal();
+    void emitCancelSignal();
+    void showMessage(const QString &msg);
+};
+
+class CreateFolderDialog : public Dialog
+{
+    Q_OBJECT
+public:
+    CreateFolderDialog(QWidget *parent = 0);
+    ~CreateFolderDialog();
+
+signals:
+    void selected(const QString &val);
+
+private slots:
+    void emitSelected();
+
+private:
+    QLineEdit *value;
+};
+
+class ModifyDialog : public Dialog
+{
+    Q_OBJECT
+public:
+    ModifyDialog(const QString &type, QWidget *parent = 0);
+    ~ModifyDialog();
+
+private:
+    QLineEdit *value;
+
+signals:
+    void dataChecked(int count);
+
+private slots:
+    void checkData();
 };
 
 class UserLoginDialog : public Dialog
@@ -34,10 +74,12 @@ public:
     UserLoginDialog(QWidget *parent = 0);
     void showMessage(const QString &msg);
     ~UserLoginDialog();
+
 private:
     QLineEdit *usrnm;
     QLabel *password;
     QLineEdit *passwd;
+
 signals:
     void dataChecked(const QString &name,
                      const QString &password);
@@ -50,53 +92,44 @@ class ErrorDialog : public Dialog
     Q_OBJECT
 public:
     ErrorDialog(const QString& text, QWidget* parent = 0);
+    ~ErrorDialog();
 };
 
-class FileDialog : public Dialog
+class FormulaDialog : public Dialog
 {
     Q_OBJECT
 public:
-    FileDialog(const QString& title, const QString& text,
-               QWidget* parent = 0);
-    void loadTreeData(const QMap<QString, QString> &files,
-                     const QMap<QString, QString> &folders);
-    ~FileDialog();
-public slots:
-    virtual void checkValidity() = 0;
-    void showSelectedItem();
-signals:
-    void dataChecked(const QString &name, int cols,
-                     int rows, const QString &folder);
-protected:
-    QTreeWidget *treeView;
-    QMap<QString, QString> *files;
-    QMap<QString, QString> *folders;
-    QLineEdit *fileName;
-    bool treeDataContains(const QString &string);
-    bool isFolder(const QString &nodeName);
-    bool isFile(const QString &nodeName);
-};
+    FormulaDialog(int currentRow, int currentCol,
+                  const SpreadSheet *spreadsheet,
+                  QWidget *parent = 0);
+    ~FormulaDialog();
 
-class OpenFileDialog : public FileDialog
-{
-    Q_OBJECT
-public:
-    OpenFileDialog(QWidget *parent = 0);
-public slots:
-    void checkValidity();
-};
-
-class NewFileDialog : public FileDialog
-{
-    Q_OBJECT
-public:
-    NewFileDialog(const CFGManager *cfg, QWidget *parent = 0);
-    ~NewFileDialog();
-public slots:
-    void checkValidity();
 private:
-    QLineEdit *columnCount;
-    QLineEdit *rowCount;
+    QComboBox *formula;
+    QLabel *formulaInfo;
+    QLabel *formulaFormat;
+    QLineEdit *range;
+    QLabel *rangeText;
+    QLineEdit *condition;
+    QLabel *conditionText;
+    QLabel *thenText;
+    QLineEdit *thenValue;
+    QLabel *elseText;
+    QLineEdit *elseValue;
+    const SpreadSheet *spreadsheet;
+    int currentRow;
+    int currentColumn;
+    void hideThenElse();
+    void showThenElse();
+
+private slots:
+    void showFormulaInfo(const QString &formula);
+    void addRangeItems();
+    void generateFormula();
+
+signals:
+    void setFormula(int row, int col,
+                    const QString &formula);
 };
 
 #endif // DIALOG_H

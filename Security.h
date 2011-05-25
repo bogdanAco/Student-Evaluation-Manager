@@ -9,9 +9,13 @@ class Security
 public:
     Security(const QString &key);
     ~Security();
-    QString encryptData(const QString &data);
-    QString decryptData(const QString &data);
-    QString generateKey();
+    QString encryptData(const QString &data) const;
+    QString encryptData(const QString &data,
+                        const QString &key) const;
+    QString decryptData(const QString &data) const;
+    QString decryptData(const QString &data,
+                        const QString &key) const;
+    QString generateKey() const;
     bool loadKey(const QString &key);
 
 private:

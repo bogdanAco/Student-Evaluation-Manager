@@ -7,6 +7,7 @@ SpreadSheet::SpreadSheet(int rows, int columns, QWidget *parent) : QTableWidget(
 
     setItemPrototype(new Cell);
     setSelectionMode(ContiguousSelection);
+    setContextMenuPolicy(Qt::ActionsContextMenu);
 
     refresh_timer = new QTimer(this);
     refresh_timer->start(5000);
@@ -26,7 +27,7 @@ SpreadSheet::~SpreadSheet()
     delete timestamps;
 }
 
-bool SpreadSheet::printSpreadSheet(const QString &fileName)
+bool SpreadSheet::printSpreadSheet(const QString &fileName) const
 {
 
     if (fileName.length() == 0)
@@ -126,18 +127,18 @@ QTimer *SpreadSheet::getTimer() const
 }
 
 void SpreadSheet::replaceTimestamp(int index,
-                      const QString &newVal)
+                      const QString &newVal) const
 {
     if (index < timestamps->size())
         timestamps->replace(index, newVal);
 }
 
-void SpreadSheet::addTimestamp(const QString &ts)
+void SpreadSheet::addTimestamp(const QString &ts) const
 {
     timestamps->append(ts);
 }
 
-int SpreadSheet::timestampCount()
+int SpreadSheet::timestampCount() const
 {
     return timestamps->size();
 }
@@ -191,7 +192,6 @@ void SpreadSheet::setFormula(const QString &formula)
         {
             for (int j=0; j<range.columnCount(); j++)
             {
-
                 QString f = QString(formula);
                 for (int m=0; m<matches.length(); m++)
                 {
@@ -212,7 +212,7 @@ void SpreadSheet::setFormula(const QString &formula)
     }
 }
 
-int SpreadSheet::getNonzeroRowCount(int column)
+int SpreadSheet::getNonzeroRowCount(int column) const
 {
     int count = 0;
     QTableWidgetItem *aux = new QTableWidgetItem();
@@ -400,6 +400,27 @@ void SpreadSheet::findPrevious(const QString &str,
         column = columnCount() - 1;
         --row;
     }
+}
+
+void SpreadSheet::addColumns(int columns)
+{
+    for (int i=0; i<columns; i++)
+    {
+        insertColumn(columnCount()+i);
+        setColumnCount(columnCount()+1);
+    }
+    setColumnCount(columnCount()-1);
+    clear();
+}
+
+void SpreadSheet::addRows(int rows)
+{
+    for (int i=0; i<rows; i++)
+    {
+        insertRow(rowCount()+i);
+        setRowCount(rowCount()+1);
+    }
+    setRowCount(rowCount()-1);
 }
 
 void SpreadSheet::somethingChanged(QTableWidgetItem *cell)

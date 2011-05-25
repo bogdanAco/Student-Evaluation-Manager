@@ -5,13 +5,6 @@ Cell::Cell() : QTableWidgetItem() { }
 
 Cell::Cell(const QString &text) : QTableWidgetItem(text) { }
 
-QTableWidgetItem* Cell::clone() const
-{
-    Cell *item = new Cell();
-    *item = *this;
-    return item;
-}
-
 QVariant Cell::data(int role) const
 {
     if (role == Qt::EditRole || role == Qt::StatusTipRole)
@@ -162,7 +155,7 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
     {
         return getCellValue(formula,widget);
     }
-    //functie sum(A1;A2;A3)
+    //functie nume_functie(A1;A2;A3)
     else if (first.isLower())
     {
         QStringList simple_function_names;
@@ -286,6 +279,18 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
             }
             else
                 return "#####";
+        }
+        // link("Table name";"Student";column)
+        else if (s == "link")
+        {
+            QString tableName = parameters.at(0);
+            QString value = parameters.at(1);
+            bool ok;
+            int field = ((QString)parameters.at(2)).toInt(&ok);
+            if (!ok)
+                return "#####";
+
+            emit getLink(tableName, value, field);
         }
         else
             return "#####";

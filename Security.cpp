@@ -20,7 +20,7 @@ Security::~Security()
     delete init;
 }
 
-QString Security::encryptData(const QString &data)
+QString Security::encryptData(const QString &data) const
 {
     if (!QCA::isSupported("aes128-cbc-pkcs7"))
     {
@@ -41,7 +41,29 @@ QString Security::encryptData(const QString &data)
     return QString(qPrintable(QCA::arrayToHex(result.toByteArray())));
 }
 
-QString Security::decryptData(const QString &data)
+QString Security::encryptData(const QString &data, const QString &key) const
+{
+    if (!QCA::isSupported("aes128-cbc-pkcs7"))
+    {
+        qDebug() << "AES128 not supported";
+        return "";
+    }
+
+    QCA::SecureArray dataToEncrypt = data.toAscii();
+    QCA::SymmetricKey k = QCA::SymmetricKey(QCA::hexToArray(key));
+    cipher->setup(QCA::Encode, k, *iv);
+
+    QCA::SecureArray result = cipher->process(dataToEncrypt);
+    if (!cipher->ok())
+    {
+        qDebug() << "Encryption failed\n";
+        return "";
+    }
+
+    return QString(qPrintable(QCA::arrayToHex(result.toByteArray())));
+}
+
+QString Security::decryptData(const QString &data) const
 {
     if (!QCA::isSupported("aes128-cbc-pkcs7"))
     {
@@ -51,6 +73,7 @@ QString Security::decryptData(const QString &data)
 
     QCA::SecureArray dataToDecrypt = QCA::hexToArray(data);
     cipher->setup(QCA::Decode, *key, *iv);
+
     QCA::SecureArray result = cipher->process(dataToDecrypt);
     if (!cipher->ok())
     {
@@ -61,7 +84,29 @@ QString Security::decryptData(const QString &data)
     return QString(result.data());
 }
 
-QString Security::generateKey()
+QString Security::decryptData(const QString &data, const QString &key) const
+{
+    if (!QCA::isSupported("aes128-cbc-pkcs7"))
+    {
+        qDebug() << "AES128 not supported";
+        return "";
+    }
+
+    QCA::SecureArray dataToDecrypt = QCA::hexToArray(data);
+    QCA::SymmetricKey k = QCA::SymmetricKey(QCA::hexToArray(key));
+    cipher->setup(QCA::Decode, k, *iv);
+
+    QCA::SecureArray result = cipher->process(dataToDecrypt);
+    if (!cipher->ok())
+    {
+        qDebug() << "Decryption failed\n";
+        return "";
+    }
+
+    return QString(result.data());
+}
+
+QString Security::generateKey() const
 {
     QCA::SymmetricKey newKey(16);
     return QString(qPrintable(QCA::arrayToHex(newKey.toByteArray())));

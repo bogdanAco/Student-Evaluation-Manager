@@ -1,15 +1,15 @@
 #ifndef CELL_H
 #define CELL_H
 
+#include <QtCore>
 #include <QtGui>
 
-class Cell : public QTableWidgetItem
+class Cell : public QObject, public QTableWidgetItem
 {
+    Q_OBJECT
 public:
     Cell();
     Cell(const QString &text);
-
-    QTableWidgetItem* clone() const;
 
     QVariant data(int role) const;
     void setData(int role, const QVariant &value);
@@ -31,6 +31,10 @@ private:
     QVariant getCellValue(const QString &id,
                   const QTableWidget *widget) const;
     int firstOperatorPosition(const QString &formula) const;
+
+signals:
+    void getLink(const QString &table,
+                 const QString &data, int field) const;
 };
 
 #endif // CELL_H
