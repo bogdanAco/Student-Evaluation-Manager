@@ -303,6 +303,10 @@ ImportDataDialog::ImportDataDialog(QWidget *parent) :
 
     mainLayout->addWidget(new QLabel("Data from row:"), 0, 0, 1, 3);
 
+    mainLayout->addWidget(new QLabel("Column:"), 0, 3, 1, 1);
+    columnNo = new QLineEdit();
+    mainLayout->addWidget(columnNo, 1, 3, 1, 1);
+
     searchValue = new QLineEdit();
     mainLayout->addWidget(searchValue, 1, 0, 1, 3);
 
@@ -320,7 +324,9 @@ SpreadSheet *ImportDataDialog::getSpreadsheet() const
 
 ImportDataDialog::~ImportDataDialog()
 {
-
+    delete columnNo;
+    delete searchValue;
+    delete search;
 }
 
 void ImportDataDialog::checkValidity()
@@ -330,6 +336,22 @@ void ImportDataDialog::checkValidity()
 
 void ImportDataDialog::getData()
 {
-    emit getDataSignal(0, searchValue->text(),
-                       treeView->selectedItems().at(0)->text(0));
+    showMessage("");
+
+    bool validCol;
+    int column = columnNo->text().toInt(&validCol);
+    if (!validCol)
+    {
+        showMessage("Please enter a number");
+        return;
+    }
+    if (column > table->rowCount() || column <= 0)
+    {
+        showMessage("Number must between 1 "
+                    "and table row number");
+        return;
+    }
+
+    emit getDataSignal(column-1, searchValue->text(),
+                       tableName->text());
 }

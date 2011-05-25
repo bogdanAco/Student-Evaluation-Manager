@@ -33,8 +33,7 @@ private:
     int firstOperatorPosition(const QString &formula) const;
 
 signals:
-    void getLink(const QString &table,
-                 const QString &data, int field) const;
+    void getLink(const QString &table, int row, int column) const;
 };
 
 #endif // CELL_H

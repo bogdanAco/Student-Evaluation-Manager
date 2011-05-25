@@ -86,6 +86,7 @@ private:
     SpreadSheet *table;
     QLineEdit *searchValue;
     QPushButton *search;
+    QLineEdit *columnNo;
 
 signals:
     void getDataSignal(int field, const QString &fieldVal,

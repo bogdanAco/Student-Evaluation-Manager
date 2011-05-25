@@ -175,14 +175,32 @@ void DBManager::getData()
     emit dataLoaded(current_data);
 }
 
+void DBManager::getData(const QString &table, int row, int column)
+{
+    QString aux = QString("SELECT table_name "
+                          "FROM files "
+                          "WHERE file_name='%1'").arg(table);
+    if (!query->exec(aux))
+        return;
+    while (query->next())
+        aux = query->value(0).toString();
+
+    query->prepare(QString("SELECT field%1 FROM %2 "
+                           "WHERE row_index=%3").
+                   arg(column).arg(aux).arg(row));
+    if (!query->exec())
+        return;
+    if (query->size() != 1)
+        return;
+    while (query->next())
+        aux = query->value(0).toString();
+}
+
 void DBManager::getGivenData(int field, const QString &fieldVal,
                              const QString &table)
 {
     if (field < 0 || fieldVal.length() == 0 || table.length() == 0)
-    {
-        qDebug() << "return";
         return;
-    }
 
     QString aux = QString("SELECT table_name "
                           "FROM files "
@@ -206,8 +224,10 @@ void DBManager::getGivenData(int field, const QString &fieldVal,
     if (columns == 0)
         return;
 
+    int row = 0;
     QStringList current_data = QStringList();
     while (query->next())
+    {
         for (int i=2; i<columns; i++)
         {
             QString decryptedData;
@@ -217,7 +237,10 @@ void DBManager::getGivenData(int field, const QString &fieldVal,
 
             current_data.append(decryptedData);
         }
+        row = query->value(record.indexOf("row_index")).toInt();
+    }
     emit givenDataLoaded(current_data);
+    emit givenDataLoaded(row, field);
 }
 
 void DBManager::createTable(const QString &name, int columns,
@@ -603,10 +626,11 @@ void DBManager::changeKey(const QString &oldKey,
                 aux.append(encryptedData.at(r).at(c)).append("', '");
             aux.remove(aux.length()-3, 3);
             aux.append(")");
-            qDebug() << aux;
             query->exec(aux);
         }
     }
+
+    security->loadKey(key);
 }
 
 void DBManager::changePKey(const QString &oldKey,

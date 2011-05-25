@@ -26,6 +26,7 @@ signals:
     void queryError(const QString &error);
     void dataLoaded(const QStringList &data);
     void givenDataLoaded(const QStringList &data);
+    void givenDataLoaded(int row, int column);
     void tableCreated(const QString &data, int columns, int rows);
     void tableOpened(const QString &name, int columns, int rows);
     void loggedIn(int uid);
@@ -41,11 +42,12 @@ private:
     QSqlQuery *query;
     QString *current_table;
     const SpreadSheet *spreadsheet;
-    const Security *security;
+    Security *security;
     const CFGManager *cfg;
 
 public slots:
     void getData();
+    void getData(const QString &table, int row, int column);
     void getGivenData(int field, const QString &fieldVal,
                       const QString &table);
     void createTable(const QString &name, int columns,

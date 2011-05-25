@@ -35,6 +35,7 @@ private:
 
 signals:
     void modified(const QString &cellData);
+    void getLink(const QString &table, int row, int column) const;
 
 public slots:
     void setFormula(int row, int column, const QString &formula);

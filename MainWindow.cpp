@@ -476,16 +476,6 @@ void MainWindow::importData()
 
     ((TableDialog*)dialog)->
             loadTreeData(DBcon->getTables(), DBcon->getFolders());
-    connect((TableDialog*)dialog, SIGNAL(okToDeleteTable(QString)),
-            DBcon, SLOT(removeTable(QString)));
-    connect((TableDialog*)dialog, SIGNAL(okToDeleteFolder(QString)),
-            DBcon, SLOT(removeFolder(QString)));
-    connect((TableDialog*)dialog, SIGNAL(okToCreateFolder(QString, QString)),
-            DBcon, SLOT(createFolder(QString, QString)));
-    connect(DBcon, SIGNAL(dataModified(QList<QPair<QString,QString> >,
-                                        QList<QPair<QString,QString> >)),
-            (TableDialog*)dialog, SLOT(loadTreeData(QList<QPair<QString,QString> >,
-                                                    QList<QPair<QString,QString> >)));
     dialog->show();
 }
 

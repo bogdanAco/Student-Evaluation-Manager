@@ -27,7 +27,7 @@ signals:
     void okPressed();
     void cancelPressed();
 
-private slots:
+protected slots:
     void emitOKSignal();
     void emitCancelSignal();
     void showMessage(const QString &msg);

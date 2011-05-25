@@ -118,6 +118,6 @@ bool Security::loadKey(const QString &key)
         return false;
 
     this->key = new QCA::SymmetricKey(QCA::hexToArray(key));
-    cipher->setup(QCA::Encode, *this->key);
+    cipher->setup(QCA::Encode, *this->key, *iv);
     return true;
 }
