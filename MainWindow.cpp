@@ -3,13 +3,21 @@
 MainWindow::MainWindow(const QString& title) : QMainWindow()
 {
     resetSize();
-    this->setWindowTitle(title);
+    setWindowTitle(title);
+    CreateActions();
+    CreateMenus();
+    CreateToolbars();
+    show();
 
     dialog = 0;
     Spreadsheet = 0;
     connected = false;
     config = new CFGManager();
     DBcon = new DBManager(config);
+    connect(DBcon, SIGNAL(queryError(QString)),
+            this, SLOT(CreateErrorDialog(QString)));
+    connect(DBcon, SIGNAL(initializeDatabaseRequest()),
+            this, SLOT(initializeDatabase()));
     if(DBcon->connectDB(config->getDBUser(), config->getDBPassword()))
     {
         dialog = new UserLoginDialog(this);
@@ -19,20 +27,13 @@ MainWindow::MainWindow(const QString& title) : QMainWindow()
         connect(DBcon, SIGNAL(loggedIn(int)), this, SLOT(logIn(int)));
     }
     else
-    {
         connected = false;
-        CreateErrorDialog("Not connected to database: please "
-                          "check your database connection and"
-                          " restart the application");
-    }
-    CreateActions();
-    CreateMenus();
-    CreateToolbars();
 }
 
 void MainWindow::resetSize()
 {
-    this->setMinimumSize(660, 600);
+    this->setMinimumSize(600, 600);
+    this->resize(900, 600);
 }
 
 MainWindow::~MainWindow()
@@ -44,10 +45,13 @@ MainWindow::~MainWindow()
     delete menuBar;
     delete tableToolBar;
     delete editToolBar;
+    delete appToolBar;
     for (int i=0; i<tableActions.length(); i++)
         delete tableActions[i];
     for (int i=0; i<editActions.length(); i++)
         delete editActions[i];
+    for (int i=0; i<appActions.length(); i++)
+        delete appActions[i];
 }
 
 void MainWindow::CreateMenus()
@@ -58,8 +62,11 @@ void MainWindow::CreateMenus()
     table->insertSeparator(exportTableAction);
     edit = new QMenu("&Edit",menuBar);
     edit->addActions(editActions);
+    application = new QMenu("&Application",menuBar);
+    application->addActions(appActions);
     menuBar->addMenu(table);
     menuBar->addMenu(edit);
+    menuBar->addMenu(application);
     menuBar->setMinimumWidth(700);
     this->setMenuBar(menuBar);
 }
@@ -90,7 +97,7 @@ void MainWindow::CreateActions()
     importTableAction = new QAction(QIcon("images/new.png"),
                                     "&Import data",this);
     importTableAction->setStatusTip("Import data from another table");
-    connect(importTableAction,SIGNAL(triggered()),this,SLOT(importData()));
+    connect(importTableAction,SIGNAL(triggered()),this,SLOT(createImportDataDialog()));
     tableActions << importTableAction;
 
     exportTableAction = new QAction(QIcon("images/save.png"),
@@ -132,31 +139,42 @@ void MainWindow::CreateActions()
     addColumnAction = new QAction(QIcon("images/add.png"),
                                "&Add columns",this);
     addColumnAction->setStatusTip("Add new column");
-    connect(addColumnAction,SIGNAL(triggered()),this,SLOT(addColumns()));
+    connect(addColumnAction,SIGNAL(triggered()),this,SLOT(createAddColumnsDialog()));
     editActions << addColumnAction;
 
     removeColumnAction = new QAction(QIcon("images/remove.png"),
                                "&Remove columns",this);
     removeColumnAction->setStatusTip("Remove selected columns");
-    connect(removeColumnAction,SIGNAL(triggered()),this,SLOT(removeColumns()));
+    connect(removeColumnAction,SIGNAL(triggered()),this,SLOT(createRemoveColumnsDialog()));
     editActions << removeColumnAction;
 
     addRowAction = new QAction(QIcon("images/add.png"),
                                "&Add rows",this);
     addRowAction->setStatusTip("Add new row");
-    connect(addRowAction,SIGNAL(triggered()),this,SLOT(addRows()));
+    connect(addRowAction,SIGNAL(triggered()),this,SLOT(createAddRowsDialog()));
     editActions << addRowAction;
+
+    formulaAction = new QAction(QIcon("images/formula.png"), "Formula:", this);
+    formulaAction->setStatusTip("Insert formula into cell");
+    connect(formulaAction,SIGNAL(triggered()),this,SLOT(createFormulaDialog()));
+
+    loginAction = new QAction(QIcon("images/user.png"),
+                              "&Login",this);
+    loginAction->setStatusTip("Login into application");
+    connect(loginAction,SIGNAL(triggered()),this,SLOT(createLoginDialog()));
+    appActions << loginAction;
+
+    signinAction = new QAction(QIcon("images/user.png"),
+                              "&Sign in",this);
+    signinAction->setStatusTip("Create new user (must have the rights to do that)");
+    connect(signinAction,SIGNAL(triggered()),this,SLOT(createSignInDialog()));
+    appActions << signinAction;
 
     configureAction = new QAction(QIcon("images/settings.png"),
                                   "&Configuration",this);
     configureAction->setStatusTip("Configure application");
-    connect(configureAction,SIGNAL(triggered()),this,SLOT(configureApp()));
-    editActions << configureAction;
-
-    formulaAction = new QAction(QIcon("images/formula.png"), "Formula:", this);
-    formulaAction->setStatusTip("Insert formula into cell");
-    connect(formulaAction,SIGNAL(triggered()),this,SLOT(formula()));
-    //connect
+    connect(configureAction,SIGNAL(triggered()),this,SLOT(createConfigureAppDialog()));
+    appActions << configureAction;
 }
 
 void MainWindow::CreateToolbars()
@@ -175,7 +193,12 @@ void MainWindow::CreateToolbars()
     this->addToolBar(editToolBar);
     editToolBar->addActions(editActions);
     editToolBar->insertSeparator(addColumnAction);
-    editToolBar->insertSeparator(configureAction);
+
+    appToolBar = new QToolBar("&Application", this);
+    appToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    appToolBar->setMovable(false);
+    this->addToolBar(appToolBar);
+    appToolBar->addActions(appActions);
 
     this->addToolBarBreak();
 
@@ -192,7 +215,14 @@ void MainWindow::CreateToolbars()
 
 void MainWindow::CreateErrorDialog(const QString &message)
 {
+    /*
+    if (dialog != 0)
+        if (QString(dialog->metaObject()->className()) == "ErrorDialog")
+            if (dialog->getText() == message)
+                return; */
+
     disconnect(dialog);
+    delete dialog;
     dialog = new ErrorDialog(message, this);
     dialog->show();
 }
@@ -200,7 +230,10 @@ void MainWindow::CreateErrorDialog(const QString &message)
 void MainWindow::newTable()
 {
     if (!connected)
+    {
+        CreateErrorDialog("Please login first");
         return;
+    }
     disconnect(dialog);
     delete dialog;
     dialog = new NewTableDialog(config, this);
@@ -233,17 +266,10 @@ void MainWindow::createNewTable(const QString &name, int columns, int rows)
     Spreadsheet->addActions(editActions);
     DBcon->setCurrentSpreadSheet(Spreadsheet);
 
-    connect(DBcon, SIGNAL(dataLoaded(QStringList)),
-            Spreadsheet, SLOT(loadData(QStringList)));
-
-    connect(Spreadsheet->getTimer(), SIGNAL(timeout()),
-            DBcon, SLOT(getData()));
     connect(Spreadsheet, SIGNAL(modified(QString)),
             this, SLOT(writeToDB(QString)));
-    connect(DBcon, SIGNAL(columnsAdded(int)),
-            Spreadsheet, SLOT(addColumns(int)));
-    connect(DBcon, SIGNAL(rowsAdded(int)),
-            Spreadsheet, SLOT(addRows(int)));
+    connect(Spreadsheet, SIGNAL(invalidFormula(QString)),
+            this, SLOT(CreateErrorDialog(QString)));
 
     setWindowTitle(QString("%1 - %2").arg(name, windowTitle()));
 
@@ -256,7 +282,10 @@ void MainWindow::createNewTable(const QString &name, int columns, int rows)
 void MainWindow::openTable()
 {
     if (!connected)
+    {
+        CreateErrorDialog("Please login first");
         return;
+    }
     disconnect(dialog);
     delete dialog;
     dialog = new OpenTableDialog(this);
@@ -289,18 +318,10 @@ void MainWindow::openNewTable(const QString &name, int columns, int rows)
     Spreadsheet->addActions(editActions);
     DBcon->setCurrentSpreadSheet(Spreadsheet);
 
-    connect(DBcon, SIGNAL(dataLoaded(QStringList)),
-            Spreadsheet, SLOT(loadData(QStringList)));
-    DBcon->getData();
-
-    connect(Spreadsheet->getTimer(), SIGNAL(timeout()),
-            DBcon, SLOT(getData()));
     connect(Spreadsheet, SIGNAL(modified(QString)),
             this, SLOT(writeToDB(QString)));
-    connect(DBcon, SIGNAL(columnsAdded(int)),
-            Spreadsheet, SLOT(addColumns(int)));
-    connect(DBcon, SIGNAL(rowsAdded(int)),
-            Spreadsheet, SLOT(addRows(int)));
+    connect(Spreadsheet, SIGNAL(invalidFormula(QString)),
+            this, SLOT(CreateErrorDialog(QString)));
 
     setWindowTitle(QString("%1 - %2").arg(name, windowTitle()));
 
@@ -319,7 +340,13 @@ void MainWindow::openNewTable(const QString &name, int columns, int rows)
 void MainWindow::closeTable()
 {
     if (!connected || Spreadsheet == 0)
+    {
+        if (!connected)
+            CreateErrorDialog("Please login first");
+        else if (Spreadsheet == 0)
+            CreateErrorDialog("No table opened");
         return;
+    }
     disconnect(dialog);
     delete dialog;
     dialog = new Dialog("Close table",
@@ -357,7 +384,13 @@ void MainWindow::exportTable()
 void MainWindow::cut()
 {
     if (!connected || Spreadsheet == 0)
+    {
+        if (!connected)
+            CreateErrorDialog("Please login first");
+        else if (Spreadsheet == 0)
+            CreateErrorDialog("No table opened");
         return;
+    }
     Spreadsheet->cut();
     cellFormula->setText("");
 }
@@ -365,21 +398,39 @@ void MainWindow::cut()
 void MainWindow::copy()
 {
     if (!connected || Spreadsheet == 0)
+    {
+        if (!connected)
+            CreateErrorDialog("Please login first");
+        else if (Spreadsheet == 0)
+            CreateErrorDialog("No table opened");
         return;
+    }
     Spreadsheet->copy();
 }
 
 void MainWindow::paste()
 {
     if (!connected || Spreadsheet == 0)
+    {
+        if (!connected)
+            CreateErrorDialog("Please login first");
+        else if (Spreadsheet == 0)
+            CreateErrorDialog("No table opened");
         return;
+    }
     Spreadsheet->paste();
 }
 
 void MainWindow::del()
 {
     if (!connected || Spreadsheet == 0)
+    {
+        if (!connected)
+            CreateErrorDialog("Please login first");
+        else if (Spreadsheet == 0)
+            CreateErrorDialog("No table opened");
         return;
+    }
     Spreadsheet->del();
     cellFormula->setText("");
 }
@@ -414,10 +465,16 @@ void MainWindow::logIn(int uid)
     dialog->hide();
 }
 
-void MainWindow::addColumns()
+void MainWindow::createAddColumnsDialog()
 {
     if (!connected || Spreadsheet == 0)
+    {
+        if (!connected)
+            CreateErrorDialog("Please login first");
+        else if (Spreadsheet == 0)
+            CreateErrorDialog("No table opened");
         return;
+    }
     disconnect(dialog);
     delete dialog;
     dialog = new ModifyDialog("Add columns", this);
@@ -428,16 +485,34 @@ void MainWindow::addColumns()
             this, SLOT(resizeWindow(int)));
 }
 
-void MainWindow::removeColumns()
+void MainWindow::createRemoveColumnsDialog()
 {
     if (!connected || Spreadsheet == 0)
+    {
+        if (!connected)
+            CreateErrorDialog("Please login first");
+        else if (Spreadsheet == 0)
+            CreateErrorDialog("No table opened");
         return;
+    }
+    int ok = QMessageBox::question(this, "Remove columns",
+                                   "Are you sure you want to "
+                                   "remove the selected columns ?",
+                                   QMessageBox::Yes, QMessageBox::No);
+    if (ok == QMessageBox::Yes)
+        DBcon->removeColumns(Spreadsheet->selectedColumns());
 }
 
-void MainWindow::addRows()
+void MainWindow::createAddRowsDialog()
 {
     if (!connected || Spreadsheet == 0)
+    {
+        if (!connected)
+            CreateErrorDialog("Please login first");
+        else if (Spreadsheet == 0)
+            CreateErrorDialog("No table opened");
         return;
+    }
     disconnect(dialog);
     delete dialog;
     dialog = new ModifyDialog("Add rows", this);
@@ -448,7 +523,7 @@ void MainWindow::addRows()
             this, SLOT(resizeWindow(int)));
 }
 
-void MainWindow::configureApp()
+void MainWindow::createConfigureAppDialog()
 {
     disconnect(dialog);
     delete dialog;
@@ -462,8 +537,16 @@ void MainWindow::configureApp()
     dialog->show();
 }
 
-void MainWindow::importData()
+void MainWindow::createImportDataDialog()
 {
+    if (!connected || Spreadsheet == 0)
+    {
+        if (!connected)
+            CreateErrorDialog("Please login first");
+        else if (Spreadsheet == 0)
+            CreateErrorDialog("No table opened");
+        return;
+    }
     disconnect(dialog);
     delete dialog;
     dialog = new ImportDataDialog(this);
@@ -479,10 +562,16 @@ void MainWindow::importData()
     dialog->show();
 }
 
-void MainWindow::formula()
+void MainWindow::createFormulaDialog()
 {
     if (!connected || Spreadsheet == 0)
+    {
+        if (!connected)
+            CreateErrorDialog("Please login first");
+        else if (Spreadsheet == 0)
+            CreateErrorDialog("No table opened");
         return;
+    }
     disconnect(dialog);
     delete dialog;
     dialog = new FormulaDialog(Spreadsheet->currentRow(),
@@ -493,9 +582,52 @@ void MainWindow::formula()
     dialog->show();
 }
 
+void MainWindow::createLoginDialog()
+{
+    if (connected)
+    {
+        CreateErrorDialog("Already connected");
+        return;
+    }
+    disconnect(dialog);
+    delete dialog;
+    dialog = new UserLoginDialog(this);
+    dialog->show();
+    connect((UserLoginDialog*)dialog, SIGNAL(dataChecked(QString,QString)),
+            DBcon, SLOT(login(QString,QString)));
+    connect(DBcon, SIGNAL(loggedIn(int)), this, SLOT(logIn(int)));
+}
+
+void MainWindow::createSignInDialog()
+{
+    if (!connected)
+    {
+        CreateErrorDialog("Please login first");
+        return;
+    }
+    disconnect(dialog);
+    delete dialog;
+    dialog = new UserSignInDialog(this);
+    dialog->show();
+    connect((UserSignInDialog*)dialog, SIGNAL(dataChecked(QString,QString)),
+            DBcon, SLOT(createUser(QString,QString)));
+    connect(DBcon, SIGNAL(userCreated()), dialog, SLOT(hide()));
+}
+
 void MainWindow::resizeWindow(int cells)
 {
     int size = Spreadsheet->columnCount() * 110;
     if (size < QApplication::desktop()->width())
         this->setMinimumWidth(size);
+}
+
+void MainWindow::initializeDatabase()
+{
+    int ok = QMessageBox::question(this, "Initialization",
+                                   "Database not found\n"
+                                   "Do you want to create a new database\n"
+                                   "using the name from configuration ?",
+                                   QMessageBox::Yes, QMessageBox::No);
+    if (ok == QMessageBox::Yes)
+        DBcon->initializeDatabase();
 }

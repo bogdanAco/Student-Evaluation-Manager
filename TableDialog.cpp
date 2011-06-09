@@ -85,17 +85,17 @@ void TableDialog::showSelectedItem()
 
 void TableDialog::deleteTable()
 {
-    result->setText("");
+    showMessage("");
     if (treeView->selectedItems().length() == 0)
     {
-        result->setText("No table selected");
+        showMessage("No table selected");
         return;
     }
     QString selectedItemName = treeView->selectedItems().at(0)->text(0);
     if (isFolder(selectedItemName) ||
         selectedItemName.length() == 0)
     {
-        result->setText("No table selected");
+        showMessage("No table selected");
         return;
     }
     emit okToDeleteTable(selectedItemName);
@@ -103,22 +103,22 @@ void TableDialog::deleteTable()
 
 void TableDialog::deleteFolder()
 {
-    result->setText("");
+    showMessage("");
     if (treeView->selectedItems().length() == 0)
     {
-        result->setText("No folder selected");
+        showMessage("No folder selected");
         return;
     }
     QString selectedItemName = treeView->selectedItems().at(0)->text(0);
     if (isTable(selectedItemName) ||
         selectedItemName.length() == 0)
     {
-        result->setText("No folder selected");
+        showMessage("No folder selected");
         return;
     }
     if (selectedItemName == "Root")
     {
-        result->setText("Cannot delete root folder");
+        showMessage("Cannot delete root folder");
         return;
     }
     emit okToDeleteFolder(selectedItemName);
@@ -134,15 +134,15 @@ void TableDialog::createFolder()
 
 void TableDialog::createFolder(const QString &name)
 {
-    result->setText("");
+    showMessage("");
     if (name.length() == 0)
     {
-        result->setText("Please enter a folder name");
+        showMessage("Please enter a folder name");
         return;
     }
     if (treeDataContains(name))
     {
-        result->setText("Folder already exist");
+        showMessage("Folder already exist");
         return;
     }
 
@@ -216,16 +216,16 @@ OpenTableDialog::OpenTableDialog(QWidget *parent) :
 
 void OpenTableDialog::checkValidity()
 {
-    result->setText("");
+    showMessage("");
     int len = tableName->text().length();
     if (len == 0)
     {
-        result->setText("No table name");
+        showMessage("No table name");
         return;
     }
     if (isFolder(tableName->text()))
     {
-        result->setText("No table selected");
+        showMessage("No table selected");
         return;
     }
     emit dataChecked(tableName->text(), 0, 0, "");
@@ -255,39 +255,39 @@ NewTableDialog::~NewTableDialog()
 
 void NewTableDialog::checkValidity()
 {
-    result->setText("");
+    showMessage("");
     int len = tableName->text().length();
     if (len == 0)
     {
-        result->setText("No table name");
+        showMessage("No table name");
         return;
     }
     if (treeView->selectedItems().length() == 0)
     {
-        result->setText("No folder selected");
+        showMessage("No folder selected");
         return;
     }
     if (isTable(treeView->selectedItems().at(0)->text(0)))
     {
-        result->setText("Invalid folder selected");
+        showMessage("Invalid folder selected");
         return;
     }
     if (treeDataContains(tableName->text()))
     {
-        result->setText("Table name already exists");
+        showMessage("Table name already exists");
         return;
     }
     bool ok;
     unsigned int cols = columnCount->text().toUInt(&ok);
     if (!ok || (cols == 0))
     {
-        result->setText("Invalid column number");
+        showMessage("Invalid column number");
         return;
     }
     unsigned int rows = rowCount->text().toUInt(&ok);
     if (!ok || (rows == 0))
     {
-        result->setText("Invalid row number");
+        showMessage("Invalid row number");
         return;
     }
 
@@ -331,7 +331,16 @@ ImportDataDialog::~ImportDataDialog()
 
 void ImportDataDialog::checkValidity()
 {
+    showMessage("");
 
+    if (table->currentItem()->text().length() == 0)
+    {
+        showMessage("No item selected");
+        return;
+    }
+
+    //=link...
+    this->hide();
 }
 
 void ImportDataDialog::getData()

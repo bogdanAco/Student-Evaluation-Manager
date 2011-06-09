@@ -24,6 +24,7 @@ public:
     QString getTimestamp(int index) const;
     void setCellsSize(const QSize &size);
     void setFormula(const QString &formula);
+    QList<int> selectedColumns();
 
 private:
     QTimer *refresh_timer;
@@ -35,7 +36,9 @@ private:
 
 signals:
     void modified(const QString &cellData);
-    void getLink(const QString &table, int row, int column) const;
+    void getLink(const QString &table, int row,
+                 int column, int destRow, int destCol) const;
+    void invalidFormula(const QString &message) const;
 
 public slots:
     void setFormula(int row, int column, const QString &formula);
@@ -49,10 +52,13 @@ public slots:
     void findPrevious(const QString &str, Qt::CaseSensitivity cs);
     void addColumns(int columns);
     void addRows(int rows);
+    void removeColumns(const QList <int> column_ids);
 
 private slots:
     void somethingChanged(QTableWidgetItem *cell);
     void loadData(const QStringList &data);
+    void emitGetLink(const QString &table, int r,
+                     int c, const QTableWidgetItem* cell);
 };
 
 #endif // SPREADSHEET_H

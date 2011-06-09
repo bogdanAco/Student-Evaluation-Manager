@@ -4,10 +4,17 @@ CREATE TABLE files (
 	table_name VARCHAR(512) NOT NULL,
 	file_name VARCHAR(512) NOT NULL,
 	owner INT NOT NULL,
+	row_count INT NOT NULL,
 	folder INT,
     CONSTRAINT files_pk PRIMARY KEY (file_id)
 );
-INSERT INTO files VALUES (0, 'table0', 'Fisier test', 0, 0);
+INSERT INTO files VALUES (0, 'table0', 'Tabela test', 0, 600, 0);
+DROP TABLE IF EXISTS backup;
+CREATE TABLE backup (
+	backup_name VARCHAR(512) NOT NULL,
+	expire_date DATE NOT NULL,
+	owner INT NOT NULL
+);
 DROP TABLE IF EXISTS folders;
 CREATE TABLE folders (
 	folder_id INT NOT NULL,

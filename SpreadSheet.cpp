@@ -5,7 +5,7 @@ SpreadSheet::SpreadSheet(int rows, int columns, QWidget *parent) : QTableWidget(
     (rows < 1)?setRowCount(600):setRowCount(rows);
     (columns < 1)?setColumnCount(6):setColumnCount(columns);
 
-    setItemPrototype(new Cell);
+    setItemPrototype(new Cell());
     setSelectionMode(ContiguousSelection);
     setContextMenuPolicy(Qt::ActionsContextMenu);
 
@@ -169,6 +169,10 @@ void SpreadSheet::setFormula(const QString &formula)
     if (range.columnCount() * range.rowCount() == 1)
     {
         Cell *c = new Cell(formula);
+        connect(c, SIGNAL(getLink(QString,int,int,const QTableWidgetItem*)),
+                this, SLOT(emitGetLink(QString,int,int,const QTableWidgetItem*)));
+        connect(c, SIGNAL(invalidFormula(QString)),
+                this, SIGNAL(invalidFormula(QString)));
         c->setData(Qt::EditRole, formula);
         setItem(range.topRow(), range.leftColumn(), c);
     }
@@ -205,11 +209,31 @@ void SpreadSheet::setFormula(const QString &formula)
                 }
 
                 Cell *c = new Cell(f);
+                connect(c, SIGNAL(getLink(QString,int,int,const QTableWidgetItem*)),
+                        this, SLOT(emitGetLink(QString,int,int,const QTableWidgetItem*)));
+                connect(c, SIGNAL(invalidFormula(QString)),
+                        this, SIGNAL(invalidFormula(QString)));
                 c->setData(Qt::EditRole, f);
                 setItem(range.topRow()+i, range.leftColumn()+j, c);
             }
         }
     }
+}
+
+QList<int> SpreadSheet::selectedColumns()
+{
+    int current_col = -1;
+    QList<int> aux = QList<int>();
+
+    QList<QTableWidgetItem*> columns = selectedItems();
+    for (int i=0; i<columns.length(); i++)
+    {
+        current_col = column(columns.at(i));
+        if (!aux.contains(current_col))
+            aux.append(current_col);
+    }
+
+    return aux;
 }
 
 int SpreadSheet::getNonzeroRowCount(int column) const
@@ -245,8 +269,8 @@ void SpreadSheet::clear()
 
 Cell* SpreadSheet::cell(int row, int column) const
 {
-    if (row < rowCount()-1 && column < columnCount()-1)
-        return static_cast<Cell *>(item(row, column));
+    if (row < rowCount() && column < columnCount())
+        return (Cell *)item(row, column);
     else
         return 0;
 }
@@ -273,6 +297,10 @@ void SpreadSheet::setFormula(int row, int column,
                              const QString &formula)
 {
     Cell *c = new Cell(formula);
+    connect(c, SIGNAL(getLink(QString,int,int,const QTableWidgetItem*)),
+            this, SLOT(emitGetLink(QString,int,int,const QTableWidgetItem*)));
+    connect(c, SIGNAL(invalidFormula(QString)),
+            this, SIGNAL(invalidFormula(QString)));
     c->setData(Qt::EditRole, formula);
     setItem(row, column, c);
 }
@@ -288,17 +316,18 @@ void SpreadSheet::copy()
     QTableWidgetSelectionRange range = selectedRange();
     QString str;
 
-    for (int i = 0; i < range.rowCount(); ++i)
+    for (int i=0; i<range.rowCount(); i++)
     {
-        if (i > 0)
-            str += "\n";
-        for (int j = 0; j < range.columnCount(); ++j)
+        for (int j=0; j<range.columnCount(); j++)
         {
-            if (j > 0)
-                str += "\t";
-            str += formula(range.topRow() + i, range.leftColumn() + j);
+            str += formula(range.topRow()+i, range.leftColumn()+j);
+            str += "\t";
         }
+        str.chop(1);
+        str += "\n";
     }
+    str.chop(1);
+    qDebug() << str;
     QApplication::clipboard()->setText(str);
 }
 
@@ -405,22 +434,23 @@ void SpreadSheet::findPrevious(const QString &str,
 void SpreadSheet::addColumns(int columns)
 {
     for (int i=0; i<columns; i++)
-    {
         insertColumn(columnCount()+i);
-        setColumnCount(columnCount()+1);
-    }
-    setColumnCount(columnCount()-1);
+    setColumnCount(columnCount() + columns - 1);
     clear();
 }
 
 void SpreadSheet::addRows(int rows)
 {
     for (int i=0; i<rows; i++)
-    {
         insertRow(rowCount()+i);
-        setRowCount(rowCount()+1);
-    }
-    setRowCount(rowCount()-1);
+    setRowCount(rowCount() + rows - 1);
+}
+
+void SpreadSheet::removeColumns(const QList <int> column_ids)
+{
+    for (int i=0; i<column_ids.length(); i++)
+        removeColumn(column_ids.at(i));
+    clear();
 }
 
 void SpreadSheet::somethingChanged(QTableWidgetItem *cell)
@@ -445,4 +475,10 @@ void SpreadSheet::loadData(const QStringList &data)
         for (int j=0; j<aux.length(); j++)
             this->setFormula(i, j, aux[j]);
     }
+}
+
+void SpreadSheet::emitGetLink(const QString &table, int r,
+                 int c, const QTableWidgetItem* cell)
+{
+    emit getLink(table, r, c, column(cell), row(cell));
 }

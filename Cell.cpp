@@ -144,16 +144,17 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
             double x = s.toDouble(&ok);
             if (ok)
                 return x;
-            else
-                return "#####";
         }
-        else
-            return "#####";
+        emit invalidFormula(QString("Invalid number or number format in %1").arg(s));
+        return "#####";
     }
     //celula A2
     else if (first.isUpper())
     {
-        return getCellValue(formula,widget);
+        QVariant cellVal = getCellValue(formula,widget);
+        if (cellVal == "#####")
+            emit invalidFormula(QString("Invalid cell id in %1").arg(formula));
+        return cellVal;
     }
     //functie nume_functie(A1;A2;A3)
     else if (first.isLower())
@@ -170,7 +171,10 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
         if (s.count('(') == s.count(')'))
             parameters = params.split(';');
         else
+        {
+            emit invalidFormula(QString("Invalid paranthesis number ").append(s));
             return "#####";
+        }
         s = formula.left(formula.indexOf('('));
         if (simple_function_names.contains(s))
         {
@@ -180,7 +184,10 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
                 if (pattern.exactMatch(str))
                     values.append(getCellValue(str,widget));
                 else
+                {
+                    emit invalidFormula(QString("Invalid cell id: ").append(str));
                     return "#####";
+                }
 
             if (s == "sum")
             {
@@ -190,7 +197,10 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
                 {
                     tmp += aux.toDouble(&ok);
                     if (!ok)
+                    {
+                        emit invalidFormula(QString("Not a number: ").append(aux.toString()));
                         return "#####";
+                    }
                 }
                 return tmp;
             }
@@ -202,7 +212,10 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
                 {
                     tmp += aux.toDouble(&ok);
                     if (!ok)
+                    {
+                        emit invalidFormula(QString("Not a number: ").append(aux.toString()));
                         return "#####";
+                    }
                 }
                 tmp /= parameters.length();
                 return tmp;
@@ -247,10 +260,16 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
                                               firstOperand, secondOperand,
                                               parameters[1], parameters[2]);
                     else
+                    {
+                        emit invalidFormula(QString("Invalid parameter number: %1").arg(param_no));
                         return "#####";
+                    }
                 }
                 else
+                {
+                    emit invalidFormula(QString("Invalid condition format: ").append(parameters[0]));
                     return "#####";
+                }
             }
             else if (s == "countif")
             {
@@ -277,28 +296,43 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
                     return count;
                 }
             }
-            else
-                return "#####";
         }
         // link("Table name";row;column)
+        // resolved link: link("Table name";row;column;"Value")
         else if (s == "link")
         {
-            QString tableName = parameters.at(0);
+            if (parameters.length() == 4)
+                return parameters.at(3);
+
+            QString tableName = parameters[0];
             bool ok;
             int row = ((QString)parameters.at(1)).toInt(&ok);
             if (!ok)
+            {
+                emit invalidFormula(QString("Invalid row number: %1").arg(row));
                 return "#####";
+            }
             int column = ((QString)parameters.at(2)).toInt(&ok);
             if (!ok)
+            {
+                emit invalidFormula(QString("Invalid column number: %1").arg(column));
                 return "#####";
+            }
 
-            emit getLink(tableName, row, column);
+            emit getLink(tableName, row, column, this);
+            return formula;
         }
         else
+        {
+            emit invalidFormula("Invalid formula");
             return "#####";
+        }
     }
     else
+    {
+        emit invalidFormula("Invalid formula type");
         return "#####";
+    }
     return "#####";
 }
 
@@ -338,6 +372,7 @@ QString Cell::compareMembers(int &param_no, int &op_len, const QString &op,
         else if (param_no == 3)
             return case2;
     }
+    emit invalidFormula(QString("Invalid operator: ").append(op));
     return "#####";
 }
 

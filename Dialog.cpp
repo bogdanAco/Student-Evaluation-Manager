@@ -1,4 +1,5 @@
 #include "Dialog.h"
+#include "Security.h"
 
 Dialog::Dialog(const QString &title, const QString &text, QWidget* parent) :
         QDialog(parent)
@@ -34,6 +35,11 @@ Dialog::~Dialog()
     delete ok;
     delete cancel;
     delete mainLayout;
+}
+
+QString Dialog::getText()
+{
+    return this->text->text();
 }
 
 void Dialog::emitOKSignal()
@@ -150,6 +156,17 @@ UserLoginDialog::~UserLoginDialog()
     delete passwd;
 }
 
+UserSignInDialog::UserSignInDialog(QWidget *parent) :
+        UserLoginDialog(parent)
+{
+    this->setWindowTitle("User sign in");
+    mainLayout->addWidget(new QLabel("Create new user\n"
+                                     "(must have the rights to do that)",
+                                     this), 1, 0, 2, 4);
+}
+
+UserSignInDialog::~UserSignInDialog() { }
+
 ErrorDialog::ErrorDialog(const QString& text, QWidget* parent) :
         Dialog("Error", text, parent)
 {
@@ -199,11 +216,11 @@ FormulaDialog::FormulaDialog(int currentRow, int currentCol,
     mainLayout->addWidget(range, 7, 0, 1, 4);
 
     conditionText = new QLabel("Condition");
-    conditionText->setDisabled(true);
+    conditionText->hide();
     mainLayout->addWidget(conditionText, 8, 0, 1, 4);
 
     condition = new QLineEdit();
-    condition->setDisabled(true);
+    condition->hide();
     mainLayout->addWidget(condition, 9, 0, 1, 4);
 
     thenText = new QLabel("Then value:");
@@ -264,8 +281,9 @@ void FormulaDialog::showFormulaInfo(const QString &formula)
     formulaFormat->setText("");
     formulaInfo->setText("");
     rangeText->setText("Enter or select the range:");
-    condition->setDisabled(true);
-    conditionText->setDisabled(true);
+    range->setText("");
+    condition->hide();
+    conditionText->hide();
 
     if (formula == "sum")
     {
@@ -289,14 +307,12 @@ void FormulaDialog::showFormulaInfo(const QString &formula)
     {
         showThenElse();
         this->setFixedSize(220, 380);
-        rangeText->setText("Cell:");
+        rangeText->setText("Cell and condition:");
         formulaFormat->setText("if(condition;then;else)");
         formulaInfo->setText("If the condition is true, returns "
                              "the first entered value, "
                              "otherwise the second one.\n"
                              "Else value is optional");
-        condition->setEnabled(true);
-        conditionText->setEnabled(true);
     }
     else if (formula == "countif")
     {
@@ -304,18 +320,17 @@ void FormulaDialog::showFormulaInfo(const QString &formula)
         formulaInfo->setText("Counts the elements within the  "
                              "selected or entered range, "
                              "that satisfies the condition");
-        condition->setEnabled(true);
-        conditionText->setEnabled(true);
+        condition->show();
+        conditionText->show();
     }
 }
 
 void FormulaDialog::addRangeItems()
 {
-    range->setText("");
-
     if (formula->currentText() == "if")
     {
-        range->setText(spreadsheet->currentLocation());
+        QString condition = range->text().remove(QRegExp("^([A-Z][0-9]{1,3})"));
+        range->setText(spreadsheet->currentLocation().append(condition));
         return;
     }
 

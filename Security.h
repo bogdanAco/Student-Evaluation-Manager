@@ -15,8 +15,10 @@ public:
     QString decryptData(const QString &data) const;
     QString decryptData(const QString &data,
                         const QString &key) const;
-    QString generateKey() const;
     bool loadKey(const QString &key);
+
+public slots:
+    static QString generateKey();
 
 private:
     QCA::Initializer *init;

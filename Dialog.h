@@ -15,6 +15,7 @@ public:
     Dialog(const QString& title, const QString& text,
            QWidget* parent = 0);
     ~Dialog();
+    QString getText();
 
 protected:
     QGridLayout *mainLayout;
@@ -85,6 +86,14 @@ signals:
                      const QString &password);
 private slots:
     void checkData();
+};
+
+class UserSignInDialog : public UserLoginDialog
+{
+    Q_OBJECT
+public:
+    UserSignInDialog(QWidget *parent = 0);
+    ~UserSignInDialog();
 };
 
 class ErrorDialog : public Dialog

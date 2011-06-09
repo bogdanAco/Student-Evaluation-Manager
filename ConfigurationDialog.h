@@ -23,10 +23,13 @@ private:
     QVBoxLayout *databaseLayout;
     QComboBox *dbType;
     QLineEdit *dbServer;
+    QSpinBox *dbPort;
+    QLineEdit *dbName;
     QLineEdit *dbUser;
     QLineEdit *dbPass;
     QCheckBox *dbRmFolderContent;
     QCheckBox *dbBackupTables;
+    QSpinBox *dbRemoveBackup;
 
     //spreadsheet items
     QWidget *spreadSheetTab;
@@ -46,10 +49,14 @@ private:
     QComboBox *algorithm;
     QString *initialKey;
     QString *initialPKey;
+    QPushButton *generateKeyButton;
+    QPushButton *generatePKeyButton;
 
 private slots:
     void emitKeyChanged();
     void emitPKeyChanged();
+    void generateKey();
+    void generatePKey();
 
 signals:
     void changeKey(const QString &oldKey,

@@ -33,7 +33,9 @@ private:
     int firstOperatorPosition(const QString &formula) const;
 
 signals:
-    void getLink(const QString &table, int row, int column) const;
+    void getLink(const QString &table, int row,
+                 int column, const QTableWidgetItem* cell) const;
+    void invalidFormula(const QString &message) const;
 };
 
 #endif // CELL_H

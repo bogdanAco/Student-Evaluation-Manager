@@ -17,6 +17,9 @@ CFGManager::CFGManager()
         QDomElement dbServer = domDoc->createElement("server");
         dbServer.appendChild(domDoc->createTextNode("localhost"));
         database.appendChild(dbServer);
+        QDomElement dbPort = domDoc->createElement("port");
+        dbPort.appendChild(domDoc->createTextNode("-1"));
+        database.appendChild(dbPort);
         QDomElement dbName = domDoc->createElement("name");
         dbName.appendChild(domDoc->createTextNode("studMng"));
         database.appendChild(dbName);
@@ -34,6 +37,9 @@ CFGManager::CFGManager()
                 domDoc->createElement("backup_deleted_tables");
         backupTables.appendChild(domDoc->createTextNode("true"));
         database.appendChild(backupTables);
+        QDomElement expireDate = domDoc->createElement("backup_expire_after");
+        expireDate.appendChild(domDoc->createTextNode("0"));
+        database.appendChild(expireDate);
 
         QDomElement spreadsheet = domDoc->createElement("spreadsheet");
         root->appendChild(spreadsheet);
@@ -78,7 +84,7 @@ CFGManager::CFGManager()
     QFile f("personal.key");
     if (!f.open(QIODevice::ReadOnly | QFile::Text))
     {
-        pKey == new QString();
+        pKey = new QString();
         return;
     }
     QByteArray key = f.readAll();
@@ -104,6 +110,12 @@ QString CFGManager::getDBServer() const
 {
     return root->firstChildElement("database").
             firstChildElement("server").text();
+}
+
+int CFGManager::getDBPort() const
+{
+    return root->firstChildElement("database").
+            firstChildElement("port").text().toInt();
 }
 
 QString CFGManager::getDBName() const
@@ -139,6 +151,12 @@ bool CFGManager::backupTables() const
                   firstChildElement("backup_deleted_tables").
                   text();
     return (aux == "true")?true:false;
+}
+
+int CFGManager::getBackupExpireDate() const
+{
+    return root->firstChildElement("database").
+            firstChildElement("backup_expire_after").text().toInt();
 }
 
 int CFGManager::getRowCount() const
@@ -281,6 +299,14 @@ void CFGManager::setDBServer(const QString &server)
     currentValue.appendChild(domDoc->createTextNode(server));
 }
 
+void CFGManager::setDBPort(int port)
+{
+    QDomElement currentValue(root->firstChildElement("database").
+                            firstChildElement("port"));
+    currentValue.removeChild(currentValue.firstChild());
+    currentValue.appendChild(domDoc->createTextNode(QString("%1").arg(port)));
+}
+
 void CFGManager::setDBName(const QString &name)
 {
     QDomElement currentValue(root->firstChildElement("database").
@@ -322,6 +348,14 @@ void CFGManager::setBackupTables(bool backup)
                             firstChildElement("backup_deleted_tables"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(aux));
+}
+
+void CFGManager::setBackupExpireDate(int afterNDays)
+{
+    QDomElement currentValue(root->firstChildElement("database").
+                            firstChildElement("backup_expire_after"));
+    currentValue.removeChild(currentValue.firstChild());
+    currentValue.appendChild(domDoc->createTextNode(QString("%1").arg(afterNDays)));
 }
 
 void CFGManager::setRowCount(int count)

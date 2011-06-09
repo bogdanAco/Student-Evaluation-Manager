@@ -106,12 +106,6 @@ QString Security::decryptData(const QString &data, const QString &key) const
     return QString(result.data());
 }
 
-QString Security::generateKey() const
-{
-    QCA::SymmetricKey newKey(16);
-    return QString(qPrintable(QCA::arrayToHex(newKey.toByteArray())));
-}
-
 bool Security::loadKey(const QString &key)
 {
     if (key.length() != 32)
@@ -120,4 +114,10 @@ bool Security::loadKey(const QString &key)
     this->key = new QCA::SymmetricKey(QCA::hexToArray(key));
     cipher->setup(QCA::Encode, *this->key, *iv);
     return true;
+}
+
+QString Security::generateKey()
+{
+    QCA::SymmetricKey newKey(16);
+    return QString(qPrintable(QCA::arrayToHex(newKey.toByteArray())));
 }

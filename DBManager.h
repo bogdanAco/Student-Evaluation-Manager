@@ -15,6 +15,7 @@ public:
     void setCurrentSpreadSheet(const SpreadSheet *spreadsheet);
     void removeCurrentData();
 
+    void initializeDatabase();
     bool connectDB(const QString& uname, const QString& pass);
     bool writeData(int line, int column, const QString& cell_data);
     int columnCount();
@@ -25,16 +26,19 @@ public:
 signals:
     void queryError(const QString &error);
     void dataLoaded(const QStringList &data);
+    void dataLoaded(int row, int column, const QString &data);
     void givenDataLoaded(const QStringList &data);
-    void givenDataLoaded(int row, int column);
     void tableCreated(const QString &data, int columns, int rows);
     void tableOpened(const QString &name, int columns, int rows);
     void loggedIn(int uid);
+    void userCreated();
     void rowsAdded(int rows);
     void columnsAdded(int columns);
+    void columnsRemoved(const QList<int> columns);
     void dataModified(QList<QPair<QString, QString> > tables,
                        QList<QPair<QString, QString> > folders);
     void message(const QString &msg);
+    void initializeDatabaseRequest();
 
 private:
     int current_user_id;
@@ -47,7 +51,8 @@ private:
 
 public slots:
     void getData();
-    void getData(const QString &table, int row, int column);
+    void getData(const QString &table, int row, int column,
+                 int destRow, int destCol);
     void getGivenData(int field, const QString &fieldVal,
                       const QString &table);
     void createTable(const QString &name, int columns,
@@ -56,9 +61,10 @@ public slots:
                   int rows, const QString &folder);
 
     void login(const QString& uname, const QString& pass);
+    void createUser(const QString &uname, const QString &pass);
 
     void addColumns(int columns);
-    void removeColumns(QList <int> column_ids);
+    void removeColumns(const QList <int> column_ids);
     void addRows(int rows);
 
     void createFolder(const QString &name, const QString &parent);

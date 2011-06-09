@@ -12,11 +12,13 @@ public:
     //database configuration
     QString getDBType() const;
     QString getDBServer() const;
+    int getDBPort() const;
     QString getDBName() const;
     QString getDBUser() const;
     QString getDBPassword() const;
     bool removeChildren() const;
     bool backupTables() const;
+    int getBackupExpireDate() const;
     //spreadsheet configuration
     int getRowCount() const;
     int getColumnCount() const;
@@ -43,11 +45,13 @@ public slots:
     //database configuration
     void setDBType(const QString &type);
     void setDBServer(const QString &server);
+    void setDBPort(int port);
     void setDBName(const QString &name);
     void setDBUser(const QString &user);
     void setDBPassword(const QString &pass);
     void setRemoveChildren(bool remove);
     void setBackupTables(bool backup);
+    void setBackupExpireDate(int afterNDays);
     //spreadsheet configuration
     void setRowCount(int count);
     void setColumnCount(int count);

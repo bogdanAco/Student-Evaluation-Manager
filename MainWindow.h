@@ -23,7 +23,6 @@ private:
     void CreateToolbars();
     //Dialogs
     Dialog *dialog;
-    void CreateErrorDialog(const QString& message);
     //SpreadSheet
     SpreadSheet *Spreadsheet;
     //Database Manager
@@ -35,10 +34,11 @@ private:
     QMenuBar *menuBar;
     QMenu *table;
     QMenu *edit;
-    QMenu *insert;
+    QMenu *application;
     //Toolbars
     QToolBar *tableToolBar;
     QToolBar *editToolBar;
+    QToolBar *appToolBar;
     QToolBar *formulaToolBar;
     QLineEdit *cellFormula;
     //Table actions
@@ -57,10 +57,15 @@ private:
     QAction *addColumnAction;
     QAction *removeColumnAction;
     QAction *addRowAction;
-    QAction *configureAction;
     //Formula action
     QAction *formulaAction;
+    //Application actions
+    QList <QAction*> appActions;
+    QAction *configureAction;
+    QAction *loginAction;
+    QAction *signinAction;
 private slots:
+    void CreateErrorDialog(const QString& message);
     void newTable();
     void createNewTable(const QString &name,
                        int columns, int rows);
@@ -78,13 +83,16 @@ private slots:
     void showFormula(int row, int column);
     void setFormula();
     void logIn(int uid);
-    void addColumns();
-    void removeColumns();
-    void addRows();
-    void configureApp();
-    void importData();
-    void formula();
+    void createAddColumnsDialog();
+    void createRemoveColumnsDialog();
+    void createAddRowsDialog();
+    void createConfigureAppDialog();
+    void createImportDataDialog();
+    void createFormulaDialog();
+    void createLoginDialog();
+    void createSignInDialog();
     void resizeWindow(int cells);
+    void initializeDatabase();
 };
 
 #endif // MAINWINDOW_H

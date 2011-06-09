@@ -1,10 +1,11 @@
 #include "ConfigurationDialog.h"
+#include "Security.h"
 
 ConfigurationDialog::ConfigurationDialog(const CFGManager *cfg, QWidget *parent) :
         Dialog("Configuration", "", parent)
 {
     this->cfg = cfg;
-    setFixedSize(300, 400);
+    setFixedSize(300, 480);
     text->hide();
     connect(cfg, SIGNAL(errorMessage(QString)),
             this, SLOT(showMessage(QString)));
@@ -24,6 +25,8 @@ ConfigurationDialog::~ConfigurationDialog()
     //database items
     delete dbType;
     delete dbServer;
+    delete dbPort;
+    delete dbName;
     delete dbUser;
     delete dbPass;
     delete dbRmFolderContent;
@@ -44,9 +47,11 @@ ConfigurationDialog::~ConfigurationDialog()
     //security items
     delete key;
     delete pKey;
+    delete algorithm;
     delete initialKey;
     delete initialPKey;
-    delete algorithm;
+    delete generateKeyButton;
+    delete generatePKeyButton;
     delete securityLayout;
     delete securityTab;
 
@@ -83,6 +88,20 @@ void ConfigurationDialog::createDatabaseTab()
     connect(dbServer, SIGNAL(textChanged(QString)),
             cfg, SLOT(setDBServer(QString)));
 
+    databaseLayout->addWidget(new QLabel("Server port: (-1 for undefined)"));
+    dbPort = new QSpinBox();
+    dbPort->setRange(-1, 65535);
+    dbPort->setValue(cfg->getDBPort());
+    databaseLayout->addWidget(dbPort);
+    connect(dbPort, SIGNAL(valueChanged(int)),
+            cfg, SLOT(setDBPort(int)));
+
+    databaseLayout->addWidget(new QLabel("Database:"));
+    dbName = new QLineEdit(cfg->getDBName());
+    databaseLayout->addWidget(dbName);
+    connect(dbName, SIGNAL(textChanged(QString)),
+            cfg, SLOT(setDBName(QString)));
+
     databaseLayout->addWidget(new QLabel("Username:"));
     dbUser = new QLineEdit(cfg->getDBUser());
     databaseLayout->addWidget(dbUser);
@@ -108,6 +127,14 @@ void ConfigurationDialog::createDatabaseTab()
     databaseLayout->addWidget(dbBackupTables);
     connect(dbBackupTables, SIGNAL(toggled(bool)),
             cfg, SLOT(setBackupTables(bool)));
+
+    databaseLayout->addWidget(new QLabel("Remove backup after N days:"));
+    dbRemoveBackup = new QSpinBox();
+    dbRemoveBackup->setRange(0, INT_MAX);
+    dbRemoveBackup->setValue(cfg->getBackupExpireDate());
+    databaseLayout->addWidget(dbRemoveBackup);
+    connect(dbRemoveBackup, SIGNAL(valueChanged(int)),
+            cfg, SLOT(setBackupExpireDate(int)));
 
     databaseTab->setLayout(databaseLayout);
 }
@@ -208,6 +235,20 @@ void ConfigurationDialog::createSecurityTab()
     connect(algorithm, SIGNAL(currentIndexChanged(QString)),
             cfg, SLOT(setAlgorithm(QString)));
 
+    securityLayout->addWidget(new QLabel("Generate random general key:"));
+    generateKeyButton = new QPushButton("Generate general key");
+    generateKeyButton->setFixedWidth(150);
+    securityLayout->addWidget(generateKeyButton);
+    connect(generateKeyButton, SIGNAL(pressed()),
+            this, SLOT(generateKey()));
+
+    securityLayout->addWidget(new QLabel("Generate random personal key:"));
+    generatePKeyButton = new QPushButton("Generate personal key");
+    generatePKeyButton->setFixedWidth(150);
+    securityLayout->addWidget(generatePKeyButton);
+    connect(generatePKeyButton, SIGNAL(pressed()),
+            this, SLOT(generatePKey()));
+
     connect(this, SIGNAL(okPressed()),
             this, SLOT(emitPKeyChanged()));
     connect(this, SIGNAL(okPressed()),
@@ -228,4 +269,14 @@ void ConfigurationDialog::emitPKeyChanged()
     if (initialPKey->compare(pKey->text(), Qt::CaseSensitive) == 0)
         return;
     emit changePKey(*initialPKey, pKey->text());
+}
+
+void ConfigurationDialog::generateKey()
+{
+    key->setText(Security::generateKey());
+}
+
+void ConfigurationDialog::generatePKey()
+{
+    pKey->setText(Security::generateKey());
 }
