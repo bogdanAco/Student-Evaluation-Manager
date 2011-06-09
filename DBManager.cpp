@@ -130,7 +130,8 @@ void DBManager::login(const QString& uname, const QString& pass)
 {
     if (!db.isOpen())
     {
-        emit queryError("Not connected to the database");
+        emit queryError("Not connected to the database\n"
+                        "Please restart the application");
         return;
     }
 
