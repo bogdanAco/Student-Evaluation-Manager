@@ -609,8 +609,10 @@ void MainWindow::createSignInDialog()
     delete dialog;
     dialog = new UserSignInDialog(this);
     dialog->show();
-    connect((UserSignInDialog*)dialog, SIGNAL(dataChecked(QString,QString)),
-            DBcon, SLOT(createUser(QString,QString)));
+    connect((UserSignInDialog*)dialog, SIGNAL(dataChecked(QString,QString,QString)),
+            DBcon, SLOT(createUser(QString,QString,QString)));
+    connect((UserSignInDialog*)dialog, SIGNAL(generateKeyFile(QString,QString)),
+            config, SLOT(saveUserKey(QString,QString)));
     connect(DBcon, SIGNAL(userCreated()), dialog, SLOT(hide()));
 }
 

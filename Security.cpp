@@ -13,6 +13,58 @@ Security::Security(const QString &key)
                              *this->key, *iv);
 }
 
+/*
+void encryptSomeData()
+{
+    //initialize QCA
+    QCA::Initializer init = QCA::Initializer();
+    //generate a random symmetric 16-bytes key
+    QCA::SymmetricKey key = QCA::SymmetricKey(16);
+    //generate a random 16-bytes initialization vector
+    QCA::InitializationVector iv = QCA::InitializationVector(16);
+    //initialize the cipher for aes128 algorithm, using CBC mode,
+    //with padding enabled (by default), in encoding mode,
+    //using the given key and initialization vector
+    QCA::Cipher cipher = QCA::Cipher(QString("aes128"), QCA::Cipher::CBC,
+                                     QCA::Cipher::DefaultPadding, QCA::Encode,
+                                     key, iv);
+    //check if aes128 is available
+    if (!QCA::isSupported("aes128-cbc-pkcs7"))
+    {
+        qDebug() << "AES128 CBC PKCS7 not supported - "
+                    "please check if qca-ossl plugin"
+                    "installed correctly !";
+        return;
+    }
+    //the string we want to encrypt
+    QString s = "Hello, world !";
+    //we use SecureArray: read more here:
+    //http://delta.affinix.com/docs/qca/classQCA_1_1SecureArray.html#_details
+    QCA::SecureArray secureData = s.toAscii();
+    //we encrypt the data
+    QCA::SecureArray result = cipher.process(secureData);
+    //check if encryption succeded
+    if (!cipher.ok())
+    {
+        qDebug() << "Encryption failed !";
+        return;
+    }
+    //display the result
+    qDebug() << QString(qPrintable(QCA::arrayToHex(result.toByteArray())));
+    //set the cipher mode to encryption
+    cipher.setup(QCA::Decode, key, iv);
+    //decrypt the data
+    result = cipher.process(secureData);
+    //check if decryption succeded
+    if (!cipher.ok())
+    {
+        qDebug() << "Decryption failed !";
+        return "";
+    }
+    //display the decrypted data (it should be "Hello, world !")
+    qDebug() << QString(result.data());
+}*/
+
 Security::~Security()
 {
     delete key;

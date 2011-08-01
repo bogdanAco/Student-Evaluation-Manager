@@ -81,7 +81,8 @@ CFGManager::CFGManager()
             XMLFile->close();
         }
 
-    QFile f("personal.key");
+    QFile f(QString("%1.key").arg(root->firstChildElement("database").
+                                  firstChildElement("user").text()));
     if (!f.open(QIODevice::ReadOnly | QFile::Text))
     {
         pKey = new QString();
@@ -235,6 +236,23 @@ QString CFGManager::getPKey() const
     QFile f("personal.key");
     if (!f.open(QIODevice::ReadOnly | QFile::Text))
         return "";
+
+    QByteArray key = f.readAll();
+    f.close();
+    pKey->clear();
+    pKey->append(key);
+    return QString(key);
+}
+
+QString CFGManager::getPKey(const QString &user) const
+{
+    QFile f(QString("%1.key").arg(user));
+    if (!f.exists())
+        return "";
+
+    if (!f.open(QIODevice::ReadOnly | QFile::Text))
+        return "";
+
     QByteArray key = f.readAll();
     f.close();
     pKey->clear();
@@ -252,10 +270,23 @@ void CFGManager::saveDoc() const
         XMLFile->close();
     }
 
-    QFile f("personal.key");
+    QFile f(QString("%1.key").arg(root->firstChildElement("database").
+                                  firstChildElement("user").text()));
     if (!f.open(QIODevice::WriteOnly | QFile::Text))
         return;
     QByteArray aux = pKey->toAscii();
+    f.write(aux);
+    f.flush();
+    f.close();
+}
+
+void CFGManager::saveUserKey(const QString &user,
+                             const QString &key) const
+{
+    QFile f(QString("%1.key").arg(user));
+    if (!f.open(QIODevice::WriteOnly | QFile::Text))
+        return;
+    QByteArray aux = key.toAscii();
     f.write(aux);
     f.flush();
     f.close();

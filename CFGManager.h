@@ -32,6 +32,7 @@ public:
     //personal key
     bool pKeyExists() const;
     QString getPKey() const;
+    QString getPKey(const QString &user) const;
 
 private:
     QDomDocument *domDoc;
@@ -41,6 +42,8 @@ private:
 
 public slots:
     void saveDoc() const;
+    void saveUserKey(const QString &user,
+                     const QString &key) const;
     void undoDoc() const;
     //database configuration
     void setDBType(const QString &type);

@@ -121,7 +121,6 @@ UserLoginDialog::UserLoginDialog(QWidget *parent) :
     passwd->setEchoMode(QLineEdit::Password);
     mainLayout->addWidget(passwd, 6, 0, 1, 4);
 
-
     connect(this, SIGNAL(okPressed()), this, SLOT(checkData()));
 }
 
@@ -159,10 +158,59 @@ UserLoginDialog::~UserLoginDialog()
 UserSignInDialog::UserSignInDialog(QWidget *parent) :
         UserLoginDialog(parent)
 {
-    this->setWindowTitle("User sign in");
+    setWindowTitle("User sign in");
+    setFixedWidth(250);
+    usrnm->setText("");
+    passwd->setText("");
     mainLayout->addWidget(new QLabel("Create new user\n"
                                      "(must have the rights to do that)",
                                      this), 1, 0, 2, 4);
+    mainLayout->addWidget(new QLabel("Personal key"), 7, 0, 1, 4);
+    pKey = new QLineEdit();
+    mainLayout->addWidget(pKey, 8, 0, 1, 4);
+    mainLayout->addWidget(new QLabel("Generate random personal key"),
+                          9, 0, 1, 4);
+    generatePKey = new QPushButton("Generate");
+    generatePKey->setFixedWidth(150);
+    connect(generatePKey, SIGNAL(pressed()),
+            this, SLOT(showGeneratedKey()));
+    mainLayout->addWidget(generatePKey, 10, 0, 1, 4);
+}
+
+void UserSignInDialog::showGeneratedKey()
+{
+    pKey->setText(Security::generateKey());
+}
+
+void UserSignInDialog::checkData()
+{
+    result->setText("");
+    int name_len = usrnm->text().length();
+    int pass_len = passwd->text().length();
+    int key_len = pKey->text().length();
+    if (name_len == 0)
+    {
+        result->setText("No username entered");
+        return;
+    }
+    else if (pass_len == 0)
+    {
+        result->setText("No password entered");
+        return;
+    }
+    else if (key_len == 0)
+    {
+        result->setText("No key entered");
+        return;
+    }
+    else if (key_len != 32)
+    {
+        result->setText("Invalid key size - must be 32");
+        return;
+    }
+
+    emit dataChecked(usrnm->text(), passwd->text(), pKey->text());
+    emit generateKeyFile(usrnm->text(), pKey->text());
 }
 
 UserSignInDialog::~UserSignInDialog() { }

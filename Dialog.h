@@ -76,7 +76,7 @@ public:
     void showMessage(const QString &msg);
     ~UserLoginDialog();
 
-private:
+protected:
     QLineEdit *usrnm;
     QLabel *password;
     QLineEdit *passwd;
@@ -84,8 +84,8 @@ private:
 signals:
     void dataChecked(const QString &name,
                      const QString &password);
-private slots:
-    void checkData();
+protected slots:
+    virtual void checkData();
 };
 
 class UserSignInDialog : public UserLoginDialog
@@ -94,6 +94,21 @@ class UserSignInDialog : public UserLoginDialog
 public:
     UserSignInDialog(QWidget *parent = 0);
     ~UserSignInDialog();
+
+private:
+    QLineEdit *pKey;
+    QPushButton *generatePKey;
+
+private slots:
+    void showGeneratedKey();
+    void checkData();
+
+signals:
+    void dataChecked(const QString &name,
+                     const QString &password,
+                     const QString &key);
+    void generateKeyFile(const QString &user,
+                         const QString &key);
 };
 
 class ErrorDialog : public Dialog

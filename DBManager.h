@@ -61,7 +61,8 @@ public slots:
                   int rows, const QString &folder);
 
     void login(const QString& uname, const QString& pass);
-    void createUser(const QString &uname, const QString &pass);
+    void createUser(const QString &uname, const QString &pass,
+                    const QString &key);
 
     void addColumns(int columns);
     void removeColumns(const QList <int> column_ids);

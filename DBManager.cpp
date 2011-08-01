@@ -135,10 +135,19 @@ void DBManager::login(const QString& uname, const QString& pass)
         return;
     }
 
-    if (!cfg->pKeyExists())
-        cfg->setPKey(security->generateKey());
-    QString username = security->encryptData(uname, cfg->getPKey());
-    QString password = security->encryptData(pass, cfg->getPKey());
+    //if (!cfg->pKeyExists())
+      //  cfg->setPKey(security->generateKey());
+    //QString username = security->encryptData(uname, cfg->getPKey());
+    //QString password = security->encryptData(pass, cfg->getPKey());
+    QString userKey = cfg->getPKey(uname);
+    if (userKey == "")
+    {
+        emit queryError("Please check your database connection");
+        return;
+    }
+
+    QString username = security->encryptData(uname, userKey);
+    QString password = security->encryptData(pass, userKey);
     query->prepare("SELECT user_id, user_name, passwd "
                    "FROM users "
                    "WHERE user_name=:usr AND passwd=:pass");
@@ -189,14 +198,21 @@ void DBManager::login(const QString& uname, const QString& pass)
     emit loggedIn(current_user_id);
 }
 
-void DBManager::createUser(const QString &uname, const QString &pass)
+void DBManager::createUser(const QString &uname, const QString &pass,
+                           const QString &key)
 {
-    QString username = security->encryptData(uname, cfg->getPKey());
-    QString password = security->encryptData(pass, cfg->getPKey());
+    QString username = security->encryptData(uname, key);
+    QString password = security->encryptData(pass, key);
     query->prepare("SELECT * "
                    "FROM users "
                    "WHERE user_name=:usr");
     query->bindValue(":usr",username);
+    if (!query->exec())
+    {
+        emit queryError("Please check your database connection");
+        return;
+    }
+
     if (query->size() > 0)
     {
         emit queryError("User already exists");
@@ -214,7 +230,7 @@ void DBManager::createUser(const QString &uname, const QString &pass)
         uid = query->value(0).toInt();
 
     query->prepare("INSERT INTO users "
-                   "VALUES (:uid, :usr, :pass)");
+                   "VALUES (:uid, :usr, :pass, 0)");
     query->bindValue(":uid", uid+1);
     query->bindValue(":usr", username);
     query->bindValue(":pass", password);
