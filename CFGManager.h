@@ -27,8 +27,10 @@ public:
     QString getSelectionModeText() const;
     QSize getCellsSize() const;
     //security configuration
+    QString getLoginUser() const;
+    QString getLoginPass() const;
+    bool getPassRemember() const;
     QString getKey() const;
-    QString getAlgorithm() const;
     //personal key
     bool pKeyExists() const;
     QString getPKey() const;
@@ -64,9 +66,10 @@ public slots:
     void setRowHeight(int height);
     void setColumnWidth(int width);
     //security configuration
+    void setLoginData(const QString &name, bool rmb,
+                      const QString &password);
     void setKey(const QString &key);
     void setPKey(const QString &key) const;
-    void setAlgorithm(const QString &alg);
 
 signals:
     void errorMessage(const QString &msg) const;

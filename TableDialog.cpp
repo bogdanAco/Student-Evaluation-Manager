@@ -3,9 +3,6 @@
 TableDialog::TableDialog(const QString &title, const QString &text,
                        QWidget* parent) : Dialog(title, text, parent)
 {
-    tables = new QMap<QString, QTreeWidgetItem*>();
-    folders = new QMap<QString, QTreeWidgetItem*>();
-
     treeView = 0;
     createTreeView();
 
@@ -22,11 +19,13 @@ TableDialog::TableDialog(const QString &title, const QString &text,
 void TableDialog::loadTreeData(const QList<QPair<QString, QString> > &tables,
                                const QList<QPair<QString, QString> > &folders)
 {
-    this->tables->clear();
-    this->folders->clear();
-    treeView->hide();
-    //delete treeView;
-    createTreeView();
+    QList<QTreeWidgetItem*> items = removeTreeItemChildren(root);
+    for (int i=items.length()-1; i>=0; i--)
+        delete items.at(i);
+
+    QIcon folder = QIcon("images/folder.png");
+    QIcon file = QIcon("images/new.png");
+    qint64 folder_key = folder.cacheKey();
 
     for (int i=0; i<folders.length(); i++)
     {
@@ -35,14 +34,21 @@ void TableDialog::loadTreeData(const QList<QPair<QString, QString> > &tables,
 
         QTreeWidgetItem *item = 0;
         if (parentName == "")
-            item = new QTreeWidgetItem(treeView);
-        else if (this->folders->contains(parentName))
-            item = new QTreeWidgetItem(this->folders->value(parentName));
-
-        item->setIcon(0, QIcon("images/folder.png"));
+            item = new QTreeWidgetItem(root);
+        else
+        {
+            QList<QTreeWidgetItem*> parentNodes = treeView->findItems(parentName,
+                                                              Qt::MatchExactly |
+                                                              Qt::MatchRecursive);
+            if (parentNodes.length() <= 0)
+                continue;
+            item = new QTreeWidgetItem(parentNodes.at(0));
+        }
+        if (!item)
+            continue;
+        item->setIcon(0, folder);
         item->setText(0, folderName);
         item->setExpanded(true);
-        this->folders->insert(folderName, item);
     }
 
     for (int i=0; i<tables.length(); i++)
@@ -50,15 +56,25 @@ void TableDialog::loadTreeData(const QList<QPair<QString, QString> > &tables,
         QString tableName = tables.at(i).first;
         QString parentName = tables.at(i).second;
 
-        if (this->folders->contains(parentName))
+        QTreeWidgetItem *item = 0;
+        if (parentName == "Root")
+            item = new QTreeWidgetItem(root);
+        else
         {
-            QTreeWidgetItem *item = new QTreeWidgetItem(this->folders->value(parentName));
-            item->setIcon(0, QIcon("images/new.png"));
-            item->setText(0, tableName);
-            this->tables->insert(tableName, item);
+            QList<QTreeWidgetItem*> parentNodes = treeView->findItems(parentName,
+                                                              Qt::MatchExactly |
+                                                              Qt::MatchRecursive);
+            if (parentNodes.length() <= 0)
+                continue;
+            for (int n=0; n<parentNodes.length(); n++)
+                if (parentNodes.at(n)->icon(0).cacheKey() == folder_key)
+                    item = new QTreeWidgetItem(parentNodes.at(n));
+            if (!item)
+                continue;
         }
+        item->setIcon(0, file);
+        item->setText(0, tableName);
     }
-
     treeView->sortItems(0, Qt::AscendingOrder);
 }
 
@@ -69,8 +85,6 @@ TableDialog::~TableDialog()
     delete deleteFolderAction;
     delete createFolderAction;
     delete treeView;
-    delete tables;
-    delete folders;
     delete tableName;
 }
 
@@ -91,13 +105,16 @@ void TableDialog::deleteTable()
         showMessage("No table selected");
         return;
     }
-    QString selectedItemName = treeView->selectedItems().at(0)->text(0);
+    QTreeWidgetItem *selectedItem = treeView->selectedItems().at(0);
+    QString selectedItemName = selectedItem->text(0);
     if (isFolder(selectedItemName) ||
         selectedItemName.length() == 0)
     {
         showMessage("No table selected");
         return;
     }
+    treeView->removeItemWidget(selectedItem, 0);
+    delete selectedItem;
     emit okToDeleteTable(selectedItemName);
 }
 
@@ -145,9 +162,12 @@ void TableDialog::createFolder(const QString &name)
         showMessage("Folder already exist");
         return;
     }
-
     if (treeView->selectedItems().length() == 0)
-        emit okToCreateFolder(name, "");
+    {
+        //emit okToCreateFolder(name, "");
+        showMessage("Please select the folder's parent");
+        return;
+    }
     else
     {
         QTreeWidgetItem *item = treeView->selectedItems().at(0);
@@ -158,6 +178,18 @@ void TableDialog::createFolder(const QString &name)
     }
 }
 
+QList<QTreeWidgetItem*> TableDialog::removeTreeItemChildren(QTreeWidgetItem *item)
+{
+    QList<QTreeWidgetItem*> items;
+    for (int i=0; i<item->childCount(); i++)
+    {
+        items.append(item->child(i));
+        if (item->child(i)->childCount() > 0)
+            items.append(removeTreeItemChildren(item->child(i)));
+    }
+    return items;
+}
+
 void TableDialog::createTreeView()
 {
     treeView = new QTreeWidget(this);
@@ -165,6 +197,11 @@ void TableDialog::createTreeView()
     treeView->setHeaderLabel("Tables");
     treeView->setContextMenuPolicy(Qt::ActionsContextMenu);
     mainLayout->addWidget(treeView, 8, 0, 1, 4);
+
+    root = new QTreeWidgetItem(treeView);
+    root->setIcon(0, QIcon("images/folder.png"));
+    root->setText(0, "Root");
+    root->setExpanded(true);
 
     deleteTableAction = new QAction("Delete selected table", treeView);
     treeView->addAction(deleteTableAction);
@@ -187,24 +224,37 @@ void TableDialog::createTreeView()
 
 bool TableDialog::treeDataContains(const QString &string)
 {
-    if (tables->contains(string))
-        return true;
-    if (folders->contains(string))
+    QList<QTreeWidgetItem*> findResult = treeView->findItems(string,
+                                                             Qt::MatchExactly |
+                                                             Qt::MatchRecursive);
+    if (findResult.length() > 0)
         return true;
     return false;
 }
 
 bool TableDialog::isFolder(const QString &nodeName)
 {
-    if (folders->contains(nodeName))
-        return true;
+    QIcon folder = QIcon("images/folder.png");
+    qint64 folder_key = folder.cacheKey();
+    QList<QTreeWidgetItem*> findResult = treeView->findItems(nodeName,
+                                                      Qt::MatchExactly |
+                                                      Qt::MatchRecursive);
+    for (int n=0; n<findResult.length(); n++)
+        if (findResult.at(n)->icon(0).cacheKey() == folder_key)
+            return true;
     return false;
 }
 
 bool TableDialog::isTable(const QString &nodeName)
 {
-    if (tables->contains(nodeName))
-        return true;
+    QIcon file = QIcon("images/new.png");
+    qint64 file_key = file.cacheKey();
+    QList<QTreeWidgetItem*> findResult = treeView->findItems(nodeName,
+                                                      Qt::MatchExactly |
+                                                      Qt::MatchRecursive);
+    for (int n=0; n<findResult.length(); n++)
+        if (findResult.at(n)->icon(0).cacheKey() == file_key)
+            return true;
     return false;
 }
 

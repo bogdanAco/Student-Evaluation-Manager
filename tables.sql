@@ -1,7 +1,7 @@
 DROP TABLE IF EXISTS files;
 CREATE TABLE files (
 	file_id INT NOT NULL,
-	table_name VARCHAR(512) NOT NULL,
+	table_name VARCHAR(32) NOT NULL,
 	file_name VARCHAR(512) NOT NULL,
 	owner INT NOT NULL,
 	row_count INT NOT NULL,
@@ -36,15 +36,15 @@ CREATE TABLE users (
 	user_id INT NOT NULL,
 	user_name VARCHAR(512) NOT NULL,
 	passwd VARCHAR(512) NOT NULL,
-	access_level INT NOT NULL,
 	CONSTRAINT users_pk PRIMARY KEY (user_id)
 );
 INSERT INTO users VALUES (0, '7f8895b9bc1d4ce5a646bff247d2f46c', 
-						  '7f8895b9bc1d4ce5a646bff247d2f46c', 1);
+						  '7f8895b9bc1d4ce5a646bff247d2f46c');
 DROP TABLE IF EXISTS table0;
 CREATE TABLE table0 (
 	row_index INT NOT NULL,
 	row_timestamp VARCHAR(25) NOT NULL,
+	row_height INT NOT NULL,
 	field0 VARCHAR(512),
 	field1 VARCHAR(512),
 	field2 VARCHAR(512),
@@ -53,3 +53,27 @@ CREATE TABLE table0 (
 	field5 VARCHAR(512),
     CONSTRAINT row_index_pk PRIMARY KEY (row_index)
 );
+DROP TABLE IF EXISTS rights;
+CREATE TABLE rights (
+	table_name VARCHAR(32) NOT NULL,
+	user_id INT NOT NULL,
+	column_id INT NOT NULL
+);
+INSERT INTO rights VALUES ('table0', 0, 0);
+INSERT INTO rights VALUES ('table0', 0, 1);
+INSERT INTO rights VALUES ('table0', 0, 2);
+INSERT INTO rights VALUES ('table0', 0, 3);
+INSERT INTO rights VALUES ('table0', 0, 4);
+INSERT INTO rights VALUES ('table0', 0, 5);
+DROP TABLE IF EXISTS tables_size;
+CREATE TABLE tables_size (
+	table_name VARCHAR(32) NOT NULL,
+	column_id INT NOT NULL,
+	width INT NOT NULL
+);
+INSERT INTO tables_size VALUES ('table0', 0, 100);
+INSERT INTO tables_size VALUES ('table0', 1, 100);
+INSERT INTO tables_size VALUES ('table0', 2, 100);
+INSERT INTO tables_size VALUES ('table0', 3, 100);
+INSERT INTO tables_size VALUES ('table0', 4, 100);
+INSERT INTO tables_size VALUES ('table0', 5, 100);

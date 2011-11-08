@@ -2,6 +2,7 @@
 
 CFGManager::CFGManager()
 {
+    pKey = new QString();
     domDoc = new QDomDocument();
     XMLFile = new QFile("config.xml");
     if (!XMLFile->exists())
@@ -64,16 +65,23 @@ CFGManager::CFGManager()
 
         QDomElement security = domDoc->createElement("security");
         root->appendChild(security);
+        QDomElement loginName = domDoc->createElement("login_name");
+        loginName.appendChild(domDoc->createTextNode(" "));
+        security.appendChild(loginName);
+        QDomElement loginPass = domDoc->createElement("login_password");
+        loginPass.appendChild(domDoc->createTextNode(" "));
+        security.appendChild(loginPass);
+        QDomElement passRem = domDoc->createElement("pass_remember");
+        passRem.appendChild(domDoc->createTextNode("false"));
+        security.appendChild(passRem);
         QDomElement key = domDoc->createElement("key");
         key.appendChild(domDoc->createTextNode("621ffdd4e90bf0122a99976b7ccfb031"));
         security.appendChild(key);
-        QDomElement algorithm = domDoc->createElement("algorithm");
-        algorithm.appendChild(domDoc->createTextNode("aes128"));
-        security.appendChild(algorithm);
 
         saveDoc();
     }
     else
+    {
         if (XMLFile->open(QFile::ReadOnly | QFile::Text))
         {
             if (domDoc->setContent(XMLFile))
@@ -81,16 +89,17 @@ CFGManager::CFGManager()
             XMLFile->close();
         }
 
-    QFile f(QString("%1.key").arg(root->firstChildElement("database").
-                                  firstChildElement("user").text()));
-    if (!f.open(QIODevice::ReadOnly | QFile::Text))
-    {
-        pKey = new QString();
-        return;
+        QString username = root->firstChildElement("security").
+                           firstChildElement("login_user").text();
+        if (username == "")
+            return;
+        QFile f(QString("%1.key").arg(username));
+        if (!f.open(QIODevice::ReadOnly | QFile::Text))
+            return;
+        QByteArray key = f.readAll();
+        f.close();
+        pKey->append(key);
     }
-    QByteArray key = f.readAll();
-    f.close();
-    pKey = new QString(key);
 }
 
 CFGManager::~CFGManager()
@@ -210,16 +219,33 @@ QSize CFGManager::getCellsSize() const
     return aux;
 }
 
+QString CFGManager::getLoginUser() const
+{
+    return root->firstChildElement("security").
+            firstChildElement("login_name").text();
+}
+
+QString CFGManager::getLoginPass() const
+{
+    return root->firstChildElement("security").
+            firstChildElement("login_password").text();
+}
+
+bool CFGManager::getPassRemember() const
+{
+    QString val = root->firstChildElement("security").
+            firstChildElement("pass_remember").text();
+    if (val == "true")
+        return true;
+    else if (val == "false")
+        return false;
+    return false;
+}
+
 QString CFGManager::getKey() const
 {
     return root->firstChildElement("security").
             firstChildElement("key").text();
-}
-
-QString CFGManager::getAlgorithm() const
-{
-    return root->firstChildElement("security").
-            firstChildElement("algorithm").text();
 }
 
 bool CFGManager::pKeyExists() const
@@ -270,8 +296,11 @@ void CFGManager::saveDoc() const
         XMLFile->close();
     }
 
-    QFile f(QString("%1.key").arg(root->firstChildElement("database").
-                                  firstChildElement("user").text()));
+    QString username = root->firstChildElement("security").
+                       firstChildElement("login_user").text();
+    if (username == "")
+        return;
+    QFile f(QString("%1.key").arg(username));
     if (!f.open(QIODevice::WriteOnly | QFile::Text))
         return;
     QByteArray aux = pKey->toAscii();
@@ -450,6 +479,27 @@ void CFGManager::setColumnWidth(int width)
     currentWidth.appendChild(domDoc->createTextNode(QString("%1").arg(width)));
 }
 
+void CFGManager::setLoginData(const QString &name, bool rmb,
+                              const QString &password)
+{
+    QDomElement currentValue(root->firstChildElement("security").
+                            firstChildElement("login_name"));
+    currentValue.removeChild(currentValue.firstChild());
+    currentValue.appendChild(domDoc->createTextNode(name));
+
+    QDomElement currentValue2(root->firstChildElement("security").
+                            firstChildElement("login_password"));
+    currentValue2.removeChild(currentValue2.firstChild());
+    currentValue2.appendChild(domDoc->createTextNode(password));
+
+    QDomElement currentValue3(root->firstChildElement("security").
+                            firstChildElement("pass_remember"));
+    currentValue3.removeChild(currentValue3.firstChild());
+    currentValue3.appendChild(domDoc->createTextNode(rmb?"true":"false"));
+
+    saveDoc();
+}
+
 void CFGManager::setKey(const QString &key)
 {
     if (key.length() != 32)
@@ -473,12 +523,4 @@ void CFGManager::setPKey(const QString &key) const
     }
     pKey->clear();
     pKey->append(key);
-}
-
-void CFGManager::setAlgorithm(const QString &alg)
-{
-    QDomElement currentValue(root->firstChildElement("security").
-                            firstChildElement("algorithm"));
-    currentValue.removeChild(currentValue.firstChild());
-    currentValue.appendChild(domDoc->createTextNode(alg));
 }

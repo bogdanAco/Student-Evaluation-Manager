@@ -32,9 +32,9 @@ signals:
                           const QString &parent);
 protected:
     QTreeWidget *treeView;
+    QTreeWidgetItem *root;
+    QList<QTreeWidgetItem*> removeTreeItemChildren(QTreeWidgetItem* item);
     void createTreeView();
-    QMap<QString, QTreeWidgetItem*> *tables;
-    QMap<QString, QTreeWidgetItem*> *folders;
     QLineEdit *tableName;
     QLabel *selectLabel;
     QAction *deleteTableAction;

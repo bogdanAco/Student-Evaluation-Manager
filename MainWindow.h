@@ -30,6 +30,10 @@ private:
     DBManager *DBcon;
     //Configuration Manager
     CFGManager *config;
+    //Status bar
+    QStatusBar *status;
+    QLabel *statusMsg;
+    QTimer *timer;
     //Menus
     QMenuBar *menuBar;
     QMenu *table;
@@ -57,12 +61,16 @@ private:
     QAction *addColumnAction;
     QAction *removeColumnAction;
     QAction *addRowAction;
+    QAction *grantRightsAction;
+    QAction *setHeaderTextAction;
+    QAction *resetHeaderTextAction;
     //Formula action
     QAction *formulaAction;
     //Application actions
     QList <QAction*> appActions;
     QAction *configureAction;
     QAction *loginAction;
+    QAction *logoutAction;
     QAction *signinAction;
 private slots:
     void CreateErrorDialog(const QString& message);
@@ -83,9 +91,14 @@ private slots:
     void showFormula(int row, int column);
     void setFormula();
     void logIn(int uid);
+    void logOut();
     void createAddColumnsDialog();
     void createRemoveColumnsDialog();
     void createAddRowsDialog();
+    void createSetColumnHeaderDialog();
+    void createResetColumnHeaderDialog();
+    void createGrantRightsDialog();
+    void grantRights(const QString &username);
     void createConfigureAppDialog();
     void createImportDataDialog();
     void createFormulaDialog();
@@ -93,6 +106,8 @@ private slots:
     void createSignInDialog();
     void resizeWindow(int cells);
     void initializeDatabase();
+    void displayError(const QString &message);
+    void clearErrorMessage();
 };
 
 #endif // MAINWINDOW_H

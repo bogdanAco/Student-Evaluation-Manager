@@ -12,16 +12,25 @@ SpreadSheet::SpreadSheet(int rows, int columns, QWidget *parent) : QTableWidget(
     refresh_timer = new QTimer(this);
     refresh_timer->start(5000);
 
-    timestamps = new QStringList();
+    timestamps = new QMap<int,QString>();
 
     connect(this, SIGNAL(itemChanged(QTableWidgetItem *)),
             this, SLOT(somethingChanged(QTableWidgetItem *)));
+
+    connect(this->horizontalHeader(), SIGNAL(sectionResized(int,int,int)),
+            this, SIGNAL(columnResize(int,int,int)));
+    connect(this->verticalHeader(), SIGNAL(sectionResized(int,int,int)),
+            this, SIGNAL(rowResize(int,int,int)));
 
     clear();
 }
 
 SpreadSheet::~SpreadSheet()
 {
+    for (int i=0; i<rowCount(); i++)
+        for (int j=0; j<columnCount(); j++)
+            if (cell(i,j))
+                delete cell(i,j);
     refresh_timer->stop();
     delete refresh_timer;
     delete timestamps;
@@ -38,6 +47,11 @@ bool SpreadSheet::printSpreadSheet(const QString &fileName) const
         printer.setOutputFormat(QPrinter::PdfFormat);
         printer.setOutputFileName(fileName);
         int width = printer.width();
+        int sWidth = 0;
+        for (int i=0; i<columnCount(); i++)
+            sWidth += columnWidth(i);
+        int diff = (width - sWidth) / columnCount();
+
         QPainter painter;
 
         if (!painter.begin(&printer))
@@ -47,49 +61,58 @@ bool SpreadSheet::printSpreadSheet(const QString &fileName) const
         int y = 0;
         int incrY = 0;
         int row_height = 20;
-        for (int i=0; i<getNonzeroRowCount(0); i++)
+
+        painter.setPen(QPen(Qt::black, 1));
+        //for (int i=-1; i<rowCount(); i++)
+        for (int i=-1; i<=getMaxNonzeroRowCount(); i++)
         {
             x = 0;
             incrY = 0;
             for (int j=0; j<columnCount(); j++)
             {
                 QRect required = QRect();
-                QRect r = QRect(x, y, width/columnCount(), row_height);
+                QRect r = QRect(x, y, columnWidth(j)+diff, row_height);
                 painter.drawRect(r);
-                QString text = (cell(i,j) == NULL)?"":cell(i,j)->text();
-                painter.setFont((cell(i,j) == NULL)?font():cell(i,j)->font());
-                painter.drawText(r, Qt::AlignCenter | Qt::TextWordWrap,
+                QString text = (!cell(i,j))?"":cell(i,j)->text();
+                painter.setFont(!(cell(i,j))?font():cell(i,j)->font());
+                painter.drawText(r, cell(i,j)->textAlignment() | Qt::TextWrapAnywhere,
                                  text, &required);
 
                 if (required.height() > r.height())
                 {
-                    painter.eraseRect(r);
+                    painter.eraseRect(r.x(), r.y(), r.width(), r.height()+1);
                     incrY = required.height() - r.height();
                     int aux_height = row_height;
                     row_height = required.height();
                     r.setHeight(row_height);
                     painter.drawRect(r);
-                    painter.drawText(r, Qt::AlignCenter | Qt::TextWordWrap, text);
+                    painter.drawText(r, cell(i,j)->textAlignment() | Qt::TextWrapAnywhere, text);
 
                     int aux_x = x;
                     for (int k=j-1; k>=0; k--)
                     {
-                        aux_x -= width/columnCount();
-                        r = QRect(aux_x, y, width/columnCount(), aux_height);
+                        aux_x -= columnWidth(k)+diff;
+                        r = QRect(aux_x, y, columnWidth(k)+diff, aux_height+1);
                         painter.eraseRect(r);
                         r.setHeight(row_height);
                         painter.drawRect(r);
 
-                        text = (cell(i,k) == NULL)?"":cell(i,k)->text();
-                        painter.setFont((cell(i,k) == NULL)?font():cell(i,k)->font());
-                        painter.drawText(r, Qt::AlignCenter | Qt::TextWordWrap,
-                                                     text, &required);
+                        text = (!cell(i,k))?"":cell(i,k)->text();
+                        painter.setFont(!(cell(i,k))?font():cell(i,k)->font());
+                        painter.drawText(r, cell(i,k)->textAlignment() | Qt::TextWrapAnywhere,
+                                                     text);
                     }
                 }
-                x += width/columnCount();
+                x += columnWidth(j)+diff;
             }
             row_height = 20;
-            y += row_height + incrY;
+            if (y >= printer.height()-20)
+            {
+                printer.newPage();
+                y = 0;
+            }
+            else
+                y += row_height + incrY;
         }
         painter.end();
         return true;
@@ -129,12 +152,12 @@ void SpreadSheet::replaceTimestamp(int index,
                       const QString &newVal) const
 {
     if (index < timestamps->size())
-        timestamps->replace(index, newVal);
+        timestamps->insert(index, newVal);
 }
 
-void SpreadSheet::addTimestamp(const QString &ts) const
+void SpreadSheet::addTimestamp(int index, const QString &ts) const
 {
-    timestamps->append(ts);
+    timestamps->insert(index, ts);
 }
 
 int SpreadSheet::timestampCount() const
@@ -144,10 +167,7 @@ int SpreadSheet::timestampCount() const
 
 QString SpreadSheet::getTimestamp(int index) const
 {
-    if (index >= timestamps->size())
-        return "";
-    else
-        return timestamps->at(index);
+    return timestamps->value(index);
 }
 
 void SpreadSheet::setCellsSize(const QSize &size)
@@ -167,13 +187,17 @@ void SpreadSheet::setFormula(const QString &formula)
         return;
     if (range.columnCount() * range.rowCount() == 1)
     {
-        Cell *c = new Cell(formula);
+        Cell *c = cell(range.topRow(), range.leftColumn());
+        if (!c)
+        {
+            c = new Cell();
+            setItem(range.topRow(), range.leftColumn(), c);
+        }
         connect(c, SIGNAL(getLink(QString,int,int,const QTableWidgetItem*)),
                 this, SLOT(emitGetLink(QString,int,int,const QTableWidgetItem*)));
         connect(c, SIGNAL(invalidFormula(QString)),
                 this, SIGNAL(invalidFormula(QString)));
         c->setData(Qt::EditRole, formula);
-        setItem(range.topRow(), range.leftColumn(), c);
     }
     else
     {
@@ -207,13 +231,17 @@ void SpreadSheet::setFormula(const QString &formula)
                         f.replace(matches_pos.at(m), matches_len.at(m), new_id);
                 }
 
-                Cell *c = new Cell(f);
+                Cell *c = cell(range.topRow()+i, range.leftColumn()+j);
+                if (!c)
+                {
+                    c = new Cell();
+                    setItem(range.topRow()+i, range.leftColumn()+j, c);
+                }
                 connect(c, SIGNAL(getLink(QString,int,int,const QTableWidgetItem*)),
                         this, SLOT(emitGetLink(QString,int,int,const QTableWidgetItem*)));
                 connect(c, SIGNAL(invalidFormula(QString)),
                         this, SIGNAL(invalidFormula(QString)));
                 c->setData(Qt::EditRole, f);
-                setItem(range.topRow()+i, range.leftColumn()+j, c);
             }
         }
     }
@@ -241,14 +269,36 @@ int SpreadSheet::getNonzeroRowCount(int column) const
     QTableWidgetItem *aux = 0;
     for (int i=0; i<rowCount(); i++)
     {
-        aux = item(i, column);
-        if (aux == NULL)
+        aux = cell(i, column);
+        if (!aux)
             continue;
         else if (aux->text() != "")
             count++;
     }
     delete aux;
     return count;
+}
+
+int SpreadSheet::getMaxNonzeroRowCount() const
+{
+    int max = 0;
+    Cell *aux = 0;
+    for (int i=0; i<columnCount(); i++)
+    {
+        int count = 0;
+        for (int j=0; j<rowCount(); j++)
+        {
+            aux = cell(j, i);
+            if (!aux)
+                continue;
+            else if (aux->text() != "")
+                count++;
+        }
+        if (count > max)
+            max = count;
+    }
+    delete aux;
+    return max;
 }
 
 void SpreadSheet::clear()
@@ -258,9 +308,12 @@ void SpreadSheet::clear()
 
     for (int i = 0; i < columnCount(); ++i)
     {
-        QTableWidgetItem *item = new QTableWidgetItem;
-        item->setText(QString(QChar('A' + i)));
+        QTableWidgetItem *item = horizontalHeaderItem(i);
+        if (item)
+            continue;
+        item = new QTableWidgetItem;
         this->setHorizontalHeaderItem(i, item);
+        item->setText(QString(QChar('A' + i)));
     }
 
     setCurrentCell(0, 0);
@@ -269,7 +322,14 @@ void SpreadSheet::clear()
 Cell* SpreadSheet::cell(int row, int column) const
 {
     if (row < rowCount() && column < columnCount())
-        return (Cell *)item(row, column);
+        if (row == -1)
+        {
+            Cell* c = (Cell *)horizontalHeaderItem(column);
+            c->setTextAlignment(Qt::AlignCenter);
+            return c;
+        }
+        else
+            return (Cell *)item(row, column);
     else
         return 0;
 }
@@ -295,13 +355,17 @@ QString SpreadSheet::formula(int row, int column) const
 void SpreadSheet::setFormula(int row, int column,
                              const QString &formula)
 {
-    Cell *c = new Cell(formula);
+    Cell *c = cell(row, column);
+    if (!c)
+    {
+        c = new Cell();
+        setItem(row, column, c);
+    }
     connect(c, SIGNAL(getLink(QString,int,int,const QTableWidgetItem*)),
             this, SLOT(emitGetLink(QString,int,int,const QTableWidgetItem*)));
     connect(c, SIGNAL(invalidFormula(QString)),
             this, SIGNAL(invalidFormula(QString)));
     c->setData(Qt::EditRole, formula);
-    setItem(row, column, c);
 }
 
 void SpreadSheet::cut()
@@ -326,7 +390,6 @@ void SpreadSheet::copy()
         str += "\n";
     }
     str.chop(1);
-    qDebug() << str;
     QApplication::clipboard()->setText(str);
 }
 
@@ -370,6 +433,41 @@ void SpreadSheet::del()
             if (items[i] != 0)
                 items[i]->setData(Qt::EditRole, "");
         somethingChanged(currentItem());
+    }
+}
+
+void SpreadSheet::setCurrentColumnHeaderText(const QString &text)
+{
+    int column = currentColumn();
+    QTableWidgetItem *item = horizontalHeaderItem(column);
+    if (!item)
+    {
+        item = new QTableWidgetItem;
+        setHorizontalHeaderItem(column, item);
+    }
+    QString headerText = QString("%1").arg(QChar('A' + column));
+    if (text != "")
+        headerText.append(QString("\n%1").arg(text));
+    item->setText(headerText);
+}
+
+void SpreadSheet::setRowsSize(const QMap<int, int> size)
+{
+    QMapIterator<int, int> i(size);
+    while (i.hasNext())
+    {
+        i.next();
+        setRowHeight(i.key(), i.value());
+    }
+}
+
+void SpreadSheet::setColumnsSize(const QMap<int, int> size)
+{
+    QMapIterator<int, int> i(size);
+    while (i.hasNext())
+    {
+        i.next();
+        setColumnWidth(i.key(), i.value());
     }
 }
 
@@ -450,6 +548,35 @@ void SpreadSheet::removeColumns(const QList <int> column_ids)
     for (int i=0; i<column_ids.length(); i++)
         removeColumn(column_ids.at(i));
     clear();
+}
+
+void SpreadSheet::setRights(const QList<int> columns)
+{
+    for (int col=0; col<columnCount(); col++)
+        if (!columns.contains(col))
+            for (int row=0; row<rowCount(); row++)
+            {
+                Cell *c = cell(row, col);
+                if (!c)
+                {
+                    c = new Cell();
+                    setItem(row, col, c);
+                }
+                if (c->flags() & Qt::ItemIsEditable)
+                    c->setFlags(c->flags() ^ Qt::ItemIsEditable);
+            }
+        else
+            for (int row=0; row<rowCount(); row++)
+            {
+                Cell *c = cell(row, col);
+                if (!c)
+                {
+                    c = new Cell();
+                    setItem(row, col, c);
+                }
+                if (!(c->flags() & Qt::ItemIsEditable))
+                    c->setFlags(c->flags() | Qt::ItemIsEditable);
+            }
 }
 
 void SpreadSheet::somethingChanged(QTableWidgetItem *cell)

@@ -5,10 +5,10 @@
         <port>-1</port>
         <name>studMng</name>
         <user>root</user>
-        <password> </password>
+        <password/>
         <delete_folder_content>true</delete_folder_content>
         <backup_deleted_tables>true</backup_deleted_tables>
-        <backup_expire_after>4</backup_expire_after>
+        <backup_expire_after>0</backup_expire_after>
     </database>
     <spreadsheet>
         <rows>600</rows>
@@ -19,6 +19,9 @@
         <selection_mode>ExtendedSelection</selection_mode>
     </spreadsheet>
     <security>
+        <login_name>admin</login_name>
+        <login_password>admin</login_password>
+        <pass_remember>true</pass_remember>
         <key>621ffdd4e90bf0122a99976b7ccfb031</key>
         <algorithm>aes128</algorithm>
     </security>

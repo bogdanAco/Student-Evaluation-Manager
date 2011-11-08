@@ -18,8 +18,9 @@ public:
     QTableWidgetSelectionRange selectedRange() const;
     QTimer *getTimer() const;
     int getNonzeroRowCount(int column) const;
+    int getMaxNonzeroRowCount() const;
     void replaceTimestamp(int index, const QString &newVal) const;
-    void addTimestamp(const QString &ts) const;
+    void addTimestamp(int index, const QString &ts) const;
     int timestampCount() const;
     QString getTimestamp(int index) const;
     void setCellsSize(const QSize &size);
@@ -32,13 +33,16 @@ private:
     Cell* cell(int row,int column) const;
     QString text(int row, int column) const;
     QString formula(int row, int column) const;
-    mutable QStringList *timestamps;
+    //mutable QStringList *timestamps;
+    mutable QMap<int,QString> *timestamps;
 
 signals:
     void modified(const QString &cellData);
     void getLink(const QString &table, int row,
                  int column, int destRow, int destCol) const;
     void invalidFormula(const QString &message) const;
+    void columnResize(int logicalIndex, int oldSize, int newSize);
+    void rowResize(int logicalIndex, int oldSize, int newSize);
 
 public slots:
     void setFormula(int row, int column, const QString &formula);
@@ -46,6 +50,9 @@ public slots:
     void copy();
     void paste();
     void del();
+    void setCurrentColumnHeaderText(const QString &text);
+    void setRowsSize(const QMap<int,int> size);
+    void setColumnsSize(const QMap<int,int> size);
     void selectCurrentRow();
     void selectCurrentColumn();
     void findNext(const QString &str, Qt::CaseSensitivity cs);
@@ -53,6 +60,7 @@ public slots:
     void addColumns(int columns);
     void addRows(int rows);
     void removeColumns(const QList <int> column_ids);
+    void setRights(const QList<int> columns);
 
 private slots:
     void somethingChanged(QTableWidgetItem *cell);

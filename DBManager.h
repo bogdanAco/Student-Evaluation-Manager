@@ -25,6 +25,9 @@ public:
 
 signals:
     void queryError(const QString &error);
+    void rightsLoaded(const QList<int> columns);
+    void rowsHeightLoaded(const QMap<int,int> size);
+    void columnsWidthLoaded(const QMap<int,int> size);
     void dataLoaded(const QStringList &data);
     void dataLoaded(int row, int column, const QString &data);
     void givenDataLoaded(const QStringList &data);
@@ -64,9 +67,14 @@ public slots:
     void createUser(const QString &uname, const QString &pass,
                     const QString &key);
 
+    void grantRights(const QList<int> columns,
+                     const QString &username);
+
     void addColumns(int columns);
     void removeColumns(const QList <int> column_ids);
     void addRows(int rows);
+    void setColumnWidth(int column, int oldSize, int newSize);
+    void setRowHeight(int row, int oldSize, int newSize);
 
     void createFolder(const QString &name, const QString &parent);
     void removeFolder(const QString &name);

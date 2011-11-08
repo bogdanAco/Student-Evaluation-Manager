@@ -80,7 +80,7 @@ void CreateFolderDialog::emitSelected()
 }
 
 ModifyDialog::ModifyDialog(const QString &type, QWidget *parent) :
-        Dialog(type, QString("Modify spreadsheet:\n").append(type), parent)
+        Dialog("Modify spreadsheet", QString("Modify spreadsheet:\n").append(type), parent)
 {
     value = new QLineEdit("1");
     mainLayout->addWidget(value, 4, 0, 1, 4);
@@ -110,18 +110,45 @@ void ModifyDialog::checkData()
     emit dataChecked(count);
 }
 
-UserLoginDialog::UserLoginDialog(QWidget *parent) :
+TextModifyDialog::TextModifyDialog(const QString &type, QWidget *parent) :
+        ModifyDialog(type, parent)
+{
+    value->setText("");
+}
+
+TextModifyDialog::~TextModifyDialog() { }
+
+void TextModifyDialog::checkData()
+{
+    if (value->text() == "")
+    {
+        result->setText("No text entered");
+        return;
+    }
+    this->hide();
+    emit dataChecked(value->text());
+}
+
+UserLoginDialog::UserLoginDialog(const QString &name,
+                                 const QString &pass,
+                                 bool rmb,
+                                 QWidget *parent) :
         Dialog("User login","Username",parent)
 {
-    usrnm = new QLineEdit("admin", this);
+    usrnm = new QLineEdit(name, this);
     mainLayout->addWidget(usrnm, 4, 0, 1, 4);
     password = new QLabel("Password:",this);
     mainLayout->addWidget(password, 5, 0, 1, 4);
-    passwd = new QLineEdit("admin", this);
+    passwd = new QLineEdit(pass, this);
     passwd->setEchoMode(QLineEdit::Password);
     mainLayout->addWidget(passwd, 6, 0, 1, 4);
+    remember = new QCheckBox("Remember password", this);
+    remember->setChecked(rmb);
+    mainLayout->addWidget(remember, 7, 0, 1, 4);
 
     connect(this, SIGNAL(okPressed()), this, SLOT(checkData()));
+    connect(this, SIGNAL(dataChecked(QString,QString)),
+            this, SLOT(saveLoginData(QString,QString)));
 }
 
 void UserLoginDialog::showMessage(const QString &msg)
@@ -147,6 +174,13 @@ void UserLoginDialog::checkData()
     emit dataChecked(usrnm->text(), passwd->text());
 }
 
+void UserLoginDialog::saveLoginData(const QString &name,
+                                    const QString &password)
+{
+    QString pass = remember->isChecked()?password:" ";
+    emit saveLoginDataSignal(name, remember->isChecked(), pass);
+}
+
 UserLoginDialog::~UserLoginDialog()
 {
     this->hide();
@@ -156,8 +190,9 @@ UserLoginDialog::~UserLoginDialog()
 }
 
 UserSignInDialog::UserSignInDialog(QWidget *parent) :
-        UserLoginDialog(parent)
+        UserLoginDialog("", "", parent)
 {
+    remember->hide();
     setWindowTitle("User sign in");
     setFixedWidth(250);
     usrnm->setText("");

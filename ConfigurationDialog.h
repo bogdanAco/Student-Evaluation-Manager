@@ -46,7 +46,6 @@ private:
     QVBoxLayout *securityLayout;
     QLineEdit *key;
     QLineEdit *pKey;
-    QComboBox *algorithm;
     QString *initialKey;
     QString *initialPKey;
     QPushButton *generateKeyButton;

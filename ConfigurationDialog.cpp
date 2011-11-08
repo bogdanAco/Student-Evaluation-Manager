@@ -47,7 +47,6 @@ ConfigurationDialog::~ConfigurationDialog()
     //security items
     delete key;
     delete pKey;
-    delete algorithm;
     delete initialKey;
     delete initialPKey;
     delete generateKeyButton;
@@ -222,18 +221,11 @@ void ConfigurationDialog::createSecurityTab()
 
     securityLayout->addWidget(new QLabel("Personal data "
                                          "encryption key:"));
-    pKey = new QLineEdit(cfg->getPKey());
+    pKey = new QLineEdit(cfg->getPKey(cfg->getLoginUser()));
     initialPKey = new QString(pKey->text());
     securityLayout->addWidget(pKey);
     connect(pKey, SIGNAL(textChanged(QString)),
             cfg, SLOT(setPKey(QString)));
-
-    securityLayout->addWidget(new QLabel("Encryption algorithm:"));
-    algorithm = new QComboBox();
-    algorithm->addItem(cfg->getAlgorithm());
-    securityLayout->addWidget(algorithm);
-    connect(algorithm, SIGNAL(currentIndexChanged(QString)),
-            cfg, SLOT(setAlgorithm(QString)));
 
     securityLayout->addWidget(new QLabel("Generate random general key:"));
     generateKeyButton = new QPushButton("Generate general key");

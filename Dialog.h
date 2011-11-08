@@ -58,21 +58,38 @@ public:
     ModifyDialog(const QString &type, QWidget *parent = 0);
     ~ModifyDialog();
 
-private:
+protected:
     QLineEdit *value;
 
 signals:
     void dataChecked(int count);
 
-private slots:
-    void checkData();
+protected slots:
+    virtual void checkData();
+};
+
+class TextModifyDialog : public ModifyDialog
+{
+    Q_OBJECT
+public:
+    TextModifyDialog(const QString &type, QWidget *parent = 0);
+    ~TextModifyDialog();
+
+signals:
+    void dataChecked(const QString &username);
+
+private:
+    virtual void checkData();
 };
 
 class UserLoginDialog : public Dialog
 {
     Q_OBJECT
 public:
-    UserLoginDialog(QWidget *parent = 0);
+    UserLoginDialog(const QString &name,
+                    const QString &pass,
+                    bool rmb,
+                    QWidget *parent = 0);
     void showMessage(const QString &msg);
     ~UserLoginDialog();
 
@@ -80,12 +97,17 @@ protected:
     QLineEdit *usrnm;
     QLabel *password;
     QLineEdit *passwd;
+    QCheckBox *remember;
 
 signals:
     void dataChecked(const QString &name,
                      const QString &password);
+    void saveLoginDataSignal(const QString &name, bool rmb,
+                             const QString &password);
 protected slots:
     virtual void checkData();
+    void saveLoginData(const QString &name,
+                       const QString &password);
 };
 
 class UserSignInDialog : public UserLoginDialog
