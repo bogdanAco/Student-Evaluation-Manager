@@ -475,7 +475,10 @@ void MainWindow::logIn(int uid)
 void MainWindow::logOut()
 {
     if (connected)
+    {
         connected = false;
+        closeOpenedTable();
+    }
     else
         CreateErrorDialog("Not logged in");
 }
@@ -599,8 +602,6 @@ void MainWindow::createConfigureAppDialog()
     dialog = new ConfigurationDialog(config, this);
     connect((ConfigurationDialog*)dialog, SIGNAL(changeKey(QString,QString)),
             DBcon, SLOT(changeKey(QString,QString)));
-    connect((ConfigurationDialog*)dialog, SIGNAL(changePKey(QString,QString)),
-            DBcon, SLOT(changePKey(QString,QString)));
     connect(DBcon, SIGNAL(message(QString)),
             dialog, SLOT(showMessage(QString)));
     dialog->show();
@@ -657,34 +658,25 @@ void MainWindow::createLoginDialog()
         return;
     }
     delete dialog;
-    dialog = new UserLoginDialog(config->getLoginUser(),
-                                 config->getLoginPass(),
-                                 config->getPassRemember(),
-                                 this);
+    dialog = new UserLoginDialog(this);
     dialog->show();
     connect((UserLoginDialog*)dialog, SIGNAL(dataChecked(QString,QString)),
             DBcon, SLOT(login(QString,QString)));
+    /*
     connect((UserLoginDialog*)dialog,
             SIGNAL(saveLoginDataSignal(QString, bool, QString)),
             config,
-            SLOT(setLoginData(QString, bool, QString)));
+            SLOT(setLoginData(QString, bool, QString)));*/
     connect(DBcon, SIGNAL(loggedIn(int)), this, SLOT(logIn(int)));
 }
 
 void MainWindow::createSignInDialog()
 {
-    if (!connected)
-    {
-        CreateErrorDialog("Please login first");
-        return;
-    }
     delete dialog;
     dialog = new UserSignInDialog(this);
     dialog->show();
-    connect((UserSignInDialog*)dialog, SIGNAL(dataChecked(QString,QString,QString)),
-            DBcon, SLOT(createUser(QString,QString,QString)));
-    connect((UserSignInDialog*)dialog, SIGNAL(generateKeyFile(QString,QString)),
-            config, SLOT(saveUserKey(QString,QString)));
+    connect((UserSignInDialog*)dialog, SIGNAL(dataChecked(QString,QString)),
+            DBcon, SLOT(createUser(QString,QString)));
     connect(DBcon, SIGNAL(userCreated()), dialog, SLOT(hide()));
 }
 

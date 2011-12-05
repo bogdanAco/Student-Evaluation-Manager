@@ -129,22 +129,16 @@ void TextModifyDialog::checkData()
     emit dataChecked(value->text());
 }
 
-UserLoginDialog::UserLoginDialog(const QString &name,
-                                 const QString &pass,
-                                 bool rmb,
-                                 QWidget *parent) :
-        Dialog("User login","Username",parent)
+UserLoginDialog::UserLoginDialog(QWidget *parent) :
+        Dialog("User login", "Username", parent)
 {
-    usrnm = new QLineEdit(name, this);
+    usrnm = new QLineEdit(this);
     mainLayout->addWidget(usrnm, 4, 0, 1, 4);
     password = new QLabel("Password:",this);
     mainLayout->addWidget(password, 5, 0, 1, 4);
-    passwd = new QLineEdit(pass, this);
+    passwd = new QLineEdit(this);
     passwd->setEchoMode(QLineEdit::Password);
     mainLayout->addWidget(passwd, 6, 0, 1, 4);
-    remember = new QCheckBox("Remember password", this);
-    remember->setChecked(rmb);
-    mainLayout->addWidget(remember, 7, 0, 1, 4);
 
     connect(this, SIGNAL(okPressed()), this, SLOT(checkData()));
     connect(this, SIGNAL(dataChecked(QString,QString)),
@@ -177,8 +171,7 @@ void UserLoginDialog::checkData()
 void UserLoginDialog::saveLoginData(const QString &name,
                                     const QString &password)
 {
-    QString pass = remember->isChecked()?password:" ";
-    emit saveLoginDataSignal(name, remember->isChecked(), pass);
+    emit saveLoginDataSignal(name, password);
 }
 
 UserLoginDialog::~UserLoginDialog()
@@ -190,31 +183,14 @@ UserLoginDialog::~UserLoginDialog()
 }
 
 UserSignInDialog::UserSignInDialog(QWidget *parent) :
-        UserLoginDialog("", "", parent)
+        UserLoginDialog(parent)
 {
-    remember->hide();
     setWindowTitle("User sign in");
     setFixedWidth(250);
     usrnm->setText("");
     passwd->setText("");
-    mainLayout->addWidget(new QLabel("Create new user\n"
-                                     "(must have the rights to do that)",
+    mainLayout->addWidget(new QLabel("Create new user\n",
                                      this), 1, 0, 2, 4);
-    mainLayout->addWidget(new QLabel("Personal key"), 7, 0, 1, 4);
-    pKey = new QLineEdit();
-    mainLayout->addWidget(pKey, 8, 0, 1, 4);
-    mainLayout->addWidget(new QLabel("Generate random personal key"),
-                          9, 0, 1, 4);
-    generatePKey = new QPushButton("Generate");
-    generatePKey->setFixedWidth(150);
-    connect(generatePKey, SIGNAL(pressed()),
-            this, SLOT(showGeneratedKey()));
-    mainLayout->addWidget(generatePKey, 10, 0, 1, 4);
-}
-
-void UserSignInDialog::showGeneratedKey()
-{
-    pKey->setText(Security::generateKey());
 }
 
 void UserSignInDialog::checkData()
@@ -222,7 +198,6 @@ void UserSignInDialog::checkData()
     result->setText("");
     int name_len = usrnm->text().length();
     int pass_len = passwd->text().length();
-    int key_len = pKey->text().length();
     if (name_len == 0)
     {
         result->setText("No username entered");
@@ -233,19 +208,8 @@ void UserSignInDialog::checkData()
         result->setText("No password entered");
         return;
     }
-    else if (key_len == 0)
-    {
-        result->setText("No key entered");
-        return;
-    }
-    else if (key_len != 32)
-    {
-        result->setText("Invalid key size - must be 32");
-        return;
-    }
 
-    emit dataChecked(usrnm->text(), passwd->text(), pKey->text());
-    emit generateKeyFile(usrnm->text(), pKey->text());
+    emit dataChecked(usrnm->text(), passwd->text());
 }
 
 UserSignInDialog::~UserSignInDialog() { }

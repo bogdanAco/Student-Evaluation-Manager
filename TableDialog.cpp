@@ -90,22 +90,26 @@ TableDialog::~TableDialog()
 
 void TableDialog::showSelectedItem()
 {
-    QString selectedItemName = treeView->selectedItems().at(0)->text(0);
-    if (isTable(selectedItemName))
-        tableName->setText(selectedItemName);
-    else
-        tableName->setText("");
+    QTreeWidgetItem *selectedItem = treeView->currentItem();
+    if (selectedItem != 0)
+    {
+        QString selectedItemName = selectedItem->text(0);
+        if (isTable(selectedItemName))
+            tableName->setText(selectedItemName);
+        else
+            tableName->setText("");
+    }
 }
 
 void TableDialog::deleteTable()
 {
     showMessage("");
-    if (treeView->selectedItems().length() == 0)
+    QTreeWidgetItem *selectedItem = treeView->currentItem();
+    if (selectedItem == 0)
     {
         showMessage("No table selected");
         return;
     }
-    QTreeWidgetItem *selectedItem = treeView->selectedItems().at(0);
     QString selectedItemName = selectedItem->text(0);
     if (isFolder(selectedItemName) ||
         selectedItemName.length() == 0)
@@ -121,12 +125,13 @@ void TableDialog::deleteTable()
 void TableDialog::deleteFolder()
 {
     showMessage("");
-    if (treeView->selectedItems().length() == 0)
+    QTreeWidgetItem *selectedItem = treeView->currentItem();
+    if (selectedItem == 0)
     {
         showMessage("No folder selected");
         return;
     }
-    QString selectedItemName = treeView->selectedItems().at(0)->text(0);
+    QString selectedItemName = selectedItem->text(0);
     if (isTable(selectedItemName) ||
         selectedItemName.length() == 0)
     {
@@ -162,15 +167,14 @@ void TableDialog::createFolder(const QString &name)
         showMessage("Folder already exist");
         return;
     }
-    if (treeView->selectedItems().length() == 0)
+    if (treeView->currentItem() == 0)
     {
-        //emit okToCreateFolder(name, "");
         showMessage("Please select the folder's parent");
         return;
     }
     else
     {
-        QTreeWidgetItem *item = treeView->selectedItems().at(0);
+        QTreeWidgetItem *item = treeView->currentItem();
         if (isTable(item->text(0)))
             emit okToCreateFolder(name, item->parent()->text(0));
         else

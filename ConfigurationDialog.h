@@ -44,24 +44,17 @@ private:
     //security items
     QWidget *securityTab;
     QVBoxLayout *securityLayout;
-    QLineEdit *key;
-    QLineEdit *pKey;
-    QString *initialKey;
-    QString *initialPKey;
-    QPushButton *generateKeyButton;
-    QPushButton *generatePKeyButton;
+    QPushButton *generateKeysButton;
 
 private slots:
-    void emitKeyChanged();
-    void emitPKeyChanged();
-    void generateKey();
-    void generatePKey();
+    void prepareKeysGeneration();
+    void generateKeys(const QString &name,
+                   const QString &pass);
 
 signals:
-    void changeKey(const QString &oldKey,
-                   const QString &key);
-    void changePKey(const QString &oldKey,
-                    const QString &pKey);
+    void changeKeys(const QString &oldPrivateKey,
+                    const QString &publicKey,
+                    const QString &privateKey);
 };
 
 #endif // CONFIGURATIONDIALOG_H

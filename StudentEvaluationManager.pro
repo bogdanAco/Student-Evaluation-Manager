@@ -33,7 +33,8 @@ HEADERS  += MainWindow.h \
     TableDialog.h \
     ConfigurationDialog.h
 
-INCLUDEPATH += $$quote(qca-2.0.3/include/QtCrypto)
+#INCLUDEPATH += $$quote(qca-2.0.3\include\QtCrypto)
+INCLUDEPATH += $$quote(F:\facultate\licenta\Licenta\StudentEvaluationManager-build-desktop\qca-2.0.3\include\QtCrypto)
 
 win32 {
     LIBS += -L$$quote(qca-2.0.3/lib) -lqca2

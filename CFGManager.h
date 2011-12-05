@@ -27,25 +27,17 @@ public:
     QString getSelectionModeText() const;
     QSize getCellsSize() const;
     //security configuration
-    QString getLoginUser() const;
-    QString getLoginPass() const;
-    bool getPassRemember() const;
     QString getKey() const;
-    //personal key
-    bool pKeyExists() const;
-    QString getPKey() const;
-    QString getPKey(const QString &user) const;
 
 private:
     QDomDocument *domDoc;
     mutable QDomElement *root;
+    mutable QDomElement *currentUser;
     QFile *XMLFile;
-    QString *pKey;
 
 public slots:
+    void setCurrentUser(const QString &name) const;
     void saveDoc() const;
-    void saveUserKey(const QString &user,
-                     const QString &key) const;
     void undoDoc() const;
     //database configuration
     void setDBType(const QString &type);
@@ -66,10 +58,7 @@ public slots:
     void setRowHeight(int height);
     void setColumnWidth(int width);
     //security configuration
-    void setLoginData(const QString &name, bool rmb,
-                      const QString &password);
-    void setKey(const QString &key);
-    void setPKey(const QString &key) const;
+    void setKey(const QString &key) const;
 
 signals:
     void errorMessage(const QString &msg) const;

@@ -2,16 +2,206 @@
 
 CFGManager::CFGManager()
 {
-    pKey = new QString();
+    currentUser = 0;
     domDoc = new QDomDocument();
     XMLFile = new QFile("config.xml");
     if (!XMLFile->exists())
     {
         root = new QDomElement(domDoc->createElement("configuration"));
         domDoc->appendChild(root->toElement());
+        saveDoc();
+    }
+    else
+    {
+        if (XMLFile->open(QFile::ReadOnly | QFile::Text))
+        {
+            if (domDoc->setContent(XMLFile))
+                root = new QDomElement(domDoc->documentElement());
+            XMLFile->close();
+        }
+    }
+    setCurrentUser("default");
+}
+
+CFGManager::~CFGManager()
+{
+    delete domDoc;
+    delete root;
+    delete XMLFile;
+}
+
+QString CFGManager::getDBType() const
+{
+    if (currentUser == 0)
+        return "";
+
+    return currentUser->firstChildElement("database").
+            firstChildElement("type").text();
+}
+
+QString CFGManager::getDBServer() const
+{
+    if (currentUser == 0)
+        return "";
+
+    return currentUser->firstChildElement("database").
+            firstChildElement("server").text();
+}
+
+int CFGManager::getDBPort() const
+{
+    if (currentUser == 0)
+        return -1;
+
+    return currentUser->firstChildElement("database").
+            firstChildElement("port").text().toInt();
+}
+
+QString CFGManager::getDBName() const
+{
+    if (currentUser == 0)
+        return "";
+
+    return currentUser->firstChildElement("database").
+            firstChildElement("name").text();
+}
+
+QString CFGManager::getDBUser() const
+{
+    if (currentUser == 0)
+        return "";
+
+    return currentUser->firstChildElement("database").
+            firstChildElement("user").text();
+}
+
+QString CFGManager::getDBPassword() const
+{
+    if (currentUser == 0)
+        return "";
+
+    QString aux = currentUser->firstChildElement("database").
+                  firstChildElement("password").text();
+    return (aux != " ")?aux:"";
+}
+
+bool CFGManager::removeChildren() const
+{
+    if (currentUser == 0)
+        return false;
+
+    QString aux = currentUser->firstChildElement("database").
+                  firstChildElement("delete_folder_content").
+                  text();
+    return (aux == "true")?true:false;
+}
+
+bool CFGManager::backupTables() const
+{
+    if (currentUser == 0)
+        return "";
+
+    QString aux = currentUser->firstChildElement("database").
+                  firstChildElement("backup_deleted_tables").
+                  text();
+    return (aux == "true")?true:false;
+}
+
+int CFGManager::getBackupExpireDate() const
+{
+    if (currentUser == 0)
+        return -1;
+
+    return currentUser->firstChildElement("database").
+            firstChildElement("backup_expire_after").text().toInt();
+}
+
+int CFGManager::getRowCount() const
+{
+    if (currentUser == 0)
+        return -1;
+
+    return currentUser->firstChildElement("spreadsheet").
+            firstChildElement("rows").text().toInt();
+}
+
+int CFGManager::getColumnCount() const
+{
+    if (currentUser == 0)
+        return -1;
+
+    return currentUser->firstChildElement("spreadsheet").
+            firstChildElement("columns").text().toInt();
+}
+
+int CFGManager::getRefreshTime() const
+{
+    if (currentUser == 0)
+        return -1;
+
+    return currentUser->firstChildElement("spreadsheet").
+            firstChildElement("refresh_time").text().toInt();
+}
+
+int CFGManager::getSelectionMode() const
+{
+    if (currentUser == 0)
+        return 0;
+
+    QString mode =  currentUser->firstChildElement("spreadsheet").
+                    firstChildElement("selection_mode").text();
+    if (mode == "SingleSelection")
+        return 1;
+    else if (mode == "ContiguousSelection")
+        return 4;
+    else if (mode == "ExtendedSelection")
+        return 3;
+    else if (mode == "MultiSelection")
+        return 2;
+    else
+        return 0; //NoSelection
+}
+
+QString CFGManager::getSelectionModeText() const
+{
+    if (currentUser == 0)
+        return "";
+
+    return currentUser->firstChildElement("spreadsheet").
+            firstChildElement("selection_mode").text();
+}
+
+QSize CFGManager::getCellsSize() const
+{
+    if (currentUser == 0)
+        return QSize();
+
+    QSize aux = QSize();
+    aux.setHeight(currentUser->firstChildElement("spreadsheet").
+                  firstChildElement("row_height").text().toInt());
+    aux.setWidth(currentUser->firstChildElement("spreadsheet").
+                 firstChildElement("column_width").text().toInt());
+    return aux;
+}
+
+QString CFGManager::getKey() const
+{
+    if (currentUser == 0)
+        return "";
+
+    return currentUser->firstChildElement("security").
+            firstChildElement("key").text();
+}
+
+void CFGManager::setCurrentUser(const QString &name) const
+{
+    QDomElement node = root->firstChildElement(name);
+    if (node.isNull())
+    {
+        currentUser = new QDomElement(domDoc->createElement(name));
 
         QDomElement database = domDoc->createElement("database");
-        root->appendChild(database);
+        currentUser->appendChild(database);
         QDomElement dbType = domDoc->createElement("type");
         dbType.appendChild(domDoc->createTextNode("QMYSQL"));
         database.appendChild(dbType);
@@ -43,7 +233,7 @@ CFGManager::CFGManager()
         database.appendChild(expireDate);
 
         QDomElement spreadsheet = domDoc->createElement("spreadsheet");
-        root->appendChild(spreadsheet);
+        currentUser->appendChild(spreadsheet);
         QDomElement rows = domDoc->createElement("rows");
         rows.appendChild(domDoc->createTextNode("600"));
         spreadsheet.appendChild(rows);
@@ -64,226 +254,15 @@ CFGManager::CFGManager()
         spreadsheet.appendChild(selection);
 
         QDomElement security = domDoc->createElement("security");
-        root->appendChild(security);
-        QDomElement loginName = domDoc->createElement("login_name");
-        loginName.appendChild(domDoc->createTextNode(" "));
-        security.appendChild(loginName);
-        QDomElement loginPass = domDoc->createElement("login_password");
-        loginPass.appendChild(domDoc->createTextNode(" "));
-        security.appendChild(loginPass);
-        QDomElement passRem = domDoc->createElement("pass_remember");
-        passRem.appendChild(domDoc->createTextNode("false"));
-        security.appendChild(passRem);
+        currentUser->appendChild(security);
         QDomElement key = domDoc->createElement("key");
-        key.appendChild(domDoc->createTextNode("621ffdd4e90bf0122a99976b7ccfb031"));
+        key.appendChild(domDoc->createTextNode(" "));
         security.appendChild(key);
 
-        saveDoc();
+        root->appendChild(*currentUser);
     }
     else
-    {
-        if (XMLFile->open(QFile::ReadOnly | QFile::Text))
-        {
-            if (domDoc->setContent(XMLFile))
-                root = new QDomElement(domDoc->documentElement());
-            XMLFile->close();
-        }
-
-        QString username = root->firstChildElement("security").
-                           firstChildElement("login_user").text();
-        if (username == "")
-            return;
-        QFile f(QString("%1.key").arg(username));
-        if (!f.open(QIODevice::ReadOnly | QFile::Text))
-            return;
-        QByteArray key = f.readAll();
-        f.close();
-        pKey->append(key);
-    }
-}
-
-CFGManager::~CFGManager()
-{
-    delete pKey;
-    delete domDoc;
-    delete root;
-    delete XMLFile;
-}
-
-QString CFGManager::getDBType() const
-{
-    return root->firstChildElement("database").
-            firstChildElement("type").text();
-}
-
-QString CFGManager::getDBServer() const
-{
-    return root->firstChildElement("database").
-            firstChildElement("server").text();
-}
-
-int CFGManager::getDBPort() const
-{
-    return root->firstChildElement("database").
-            firstChildElement("port").text().toInt();
-}
-
-QString CFGManager::getDBName() const
-{
-    return root->firstChildElement("database").
-            firstChildElement("name").text();
-}
-
-QString CFGManager::getDBUser() const
-{
-    return root->firstChildElement("database").
-            firstChildElement("user").text();
-}
-
-QString CFGManager::getDBPassword() const
-{
-    QString aux = root->firstChildElement("database").
-                  firstChildElement("password").text();
-    return (aux != " ")?aux:"";
-}
-
-bool CFGManager::removeChildren() const
-{
-    QString aux = root->firstChildElement("database").
-                  firstChildElement("delete_folder_content").
-                  text();
-    return (aux == "true")?true:false;
-}
-
-bool CFGManager::backupTables() const
-{
-    QString aux = root->firstChildElement("database").
-                  firstChildElement("backup_deleted_tables").
-                  text();
-    return (aux == "true")?true:false;
-}
-
-int CFGManager::getBackupExpireDate() const
-{
-    return root->firstChildElement("database").
-            firstChildElement("backup_expire_after").text().toInt();
-}
-
-int CFGManager::getRowCount() const
-{
-    return root->firstChildElement("spreadsheet").
-            firstChildElement("rows").text().toInt();
-}
-
-int CFGManager::getColumnCount() const
-{
-    return root->firstChildElement("spreadsheet").
-            firstChildElement("columns").text().toInt();
-}
-
-int CFGManager::getRefreshTime() const
-{
-    return root->firstChildElement("spreadsheet").
-            firstChildElement("refresh_time").text().toInt();
-}
-
-int CFGManager::getSelectionMode() const
-{
-    QString mode =  root->firstChildElement("spreadsheet").
-                    firstChildElement("selection_mode").text();
-    if (mode == "SingleSelection")
-        return 1;
-    else if (mode == "ContiguousSelection")
-        return 4;
-    else if (mode == "ExtendedSelection")
-        return 3;
-    else if (mode == "MultiSelection")
-        return 2;
-    else
-        return 0; //NoSelection
-}
-
-QString CFGManager::getSelectionModeText() const
-{
-    return root->firstChildElement("spreadsheet").
-            firstChildElement("selection_mode").text();
-}
-
-QSize CFGManager::getCellsSize() const
-{
-    QSize aux = QSize();
-    aux.setHeight(root->firstChildElement("spreadsheet").
-                  firstChildElement("row_height").text().toInt());
-    aux.setWidth(root->firstChildElement("spreadsheet").
-                 firstChildElement("column_width").text().toInt());
-    return aux;
-}
-
-QString CFGManager::getLoginUser() const
-{
-    return root->firstChildElement("security").
-            firstChildElement("login_name").text();
-}
-
-QString CFGManager::getLoginPass() const
-{
-    return root->firstChildElement("security").
-            firstChildElement("login_password").text();
-}
-
-bool CFGManager::getPassRemember() const
-{
-    QString val = root->firstChildElement("security").
-            firstChildElement("pass_remember").text();
-    if (val == "true")
-        return true;
-    else if (val == "false")
-        return false;
-    return false;
-}
-
-QString CFGManager::getKey() const
-{
-    return root->firstChildElement("security").
-            firstChildElement("key").text();
-}
-
-bool CFGManager::pKeyExists() const
-{
-    QFile f("personal.key");
-    return f.exists();
-}
-
-QString CFGManager::getPKey() const
-{
-    if (pKey->length() != 0)
-        return QString(*pKey);
-
-    QFile f("personal.key");
-    if (!f.open(QIODevice::ReadOnly | QFile::Text))
-        return "";
-
-    QByteArray key = f.readAll();
-    f.close();
-    pKey->clear();
-    pKey->append(key);
-    return QString(key);
-}
-
-QString CFGManager::getPKey(const QString &user) const
-{
-    QFile f(QString("%1.key").arg(user));
-    if (!f.exists())
-        return "";
-
-    if (!f.open(QIODevice::ReadOnly | QFile::Text))
-        return "";
-
-    QByteArray key = f.readAll();
-    f.close();
-    pKey->clear();
-    pKey->append(key);
-    return QString(key);
+        currentUser = new QDomElement(node);
 }
 
 void CFGManager::saveDoc() const
@@ -295,30 +274,6 @@ void CFGManager::saveDoc() const
         XMLFile->flush();
         XMLFile->close();
     }
-
-    QString username = root->firstChildElement("security").
-                       firstChildElement("login_user").text();
-    if (username == "")
-        return;
-    QFile f(QString("%1.key").arg(username));
-    if (!f.open(QIODevice::WriteOnly | QFile::Text))
-        return;
-    QByteArray aux = pKey->toAscii();
-    f.write(aux);
-    f.flush();
-    f.close();
-}
-
-void CFGManager::saveUserKey(const QString &user,
-                             const QString &key) const
-{
-    QFile f(QString("%1.key").arg(user));
-    if (!f.open(QIODevice::WriteOnly | QFile::Text))
-        return;
-    QByteArray aux = key.toAscii();
-    f.write(aux);
-    f.flush();
-    f.close();
 }
 
 void CFGManager::undoDoc() const
@@ -336,6 +291,9 @@ void CFGManager::undoDoc() const
 
 void CFGManager::setDBType(const QString &type)
 {
+    if (currentUser == 0)
+        return;
+
     QString databaseType;
     if (type == "MySQL")
         databaseType = "QMYSQL";
@@ -345,7 +303,7 @@ void CFGManager::setDBType(const QString &type)
         databaseType = "QOCI";
     else
         databaseType = "";
-    QDomElement currentValue(root->firstChildElement("database").
+    QDomElement currentValue(currentUser->firstChildElement("database").
                             firstChildElement("type"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(databaseType));
@@ -353,7 +311,10 @@ void CFGManager::setDBType(const QString &type)
 
 void CFGManager::setDBServer(const QString &server)
 {
-    QDomElement currentValue(root->firstChildElement("database").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentValue(currentUser->firstChildElement("database").
                             firstChildElement("server"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(server));
@@ -361,7 +322,10 @@ void CFGManager::setDBServer(const QString &server)
 
 void CFGManager::setDBPort(int port)
 {
-    QDomElement currentValue(root->firstChildElement("database").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentValue(currentUser->firstChildElement("database").
                             firstChildElement("port"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(QString("%1").arg(port)));
@@ -369,7 +333,10 @@ void CFGManager::setDBPort(int port)
 
 void CFGManager::setDBName(const QString &name)
 {
-    QDomElement currentValue(root->firstChildElement("database").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentValue(currentUser->firstChildElement("database").
                             firstChildElement("name"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(name));
@@ -377,7 +344,10 @@ void CFGManager::setDBName(const QString &name)
 
 void CFGManager::setDBUser(const QString &user)
 {
-    QDomElement currentValue(root->firstChildElement("database").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentValue(currentUser->firstChildElement("database").
                             firstChildElement("user"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(user));
@@ -385,8 +355,11 @@ void CFGManager::setDBUser(const QString &user)
 
 void CFGManager::setDBPassword(const QString &pass)
 {
+    if (currentUser == 0)
+        return;
+
     QString aux = (pass == "")?" ":pass;
-    QDomElement currentValue(root->firstChildElement("database").
+    QDomElement currentValue(currentUser->firstChildElement("database").
                             firstChildElement("password"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(aux));
@@ -394,8 +367,11 @@ void CFGManager::setDBPassword(const QString &pass)
 
 void CFGManager::setRemoveChildren(bool remove)
 {
+    if (currentUser == 0)
+        return;
+
     QString aux = remove?"true":"false";
-    QDomElement currentValue(root->firstChildElement("database").
+    QDomElement currentValue(currentUser->firstChildElement("database").
                             firstChildElement("delete_folder_content"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(aux));
@@ -403,8 +379,11 @@ void CFGManager::setRemoveChildren(bool remove)
 
 void CFGManager::setBackupTables(bool backup)
 {
+    if (currentUser == 0)
+        return;
+
     QString aux = backup?"true":"false";
-    QDomElement currentValue(root->firstChildElement("database").
+    QDomElement currentValue(currentUser->firstChildElement("database").
                             firstChildElement("backup_deleted_tables"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(aux));
@@ -412,7 +391,10 @@ void CFGManager::setBackupTables(bool backup)
 
 void CFGManager::setBackupExpireDate(int afterNDays)
 {
-    QDomElement currentValue(root->firstChildElement("database").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentValue(currentUser->firstChildElement("database").
                             firstChildElement("backup_expire_after"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(QString("%1").arg(afterNDays)));
@@ -420,7 +402,10 @@ void CFGManager::setBackupExpireDate(int afterNDays)
 
 void CFGManager::setRowCount(int count)
 {
-    QDomElement currentValue(root->firstChildElement("spreadsheet").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentValue(currentUser->firstChildElement("spreadsheet").
                             firstChildElement("rows"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(QString("%1").arg(count)));
@@ -428,7 +413,10 @@ void CFGManager::setRowCount(int count)
 
 void CFGManager::setColumnCount(int count)
 {
-    QDomElement currentValue(root->firstChildElement("spreadsheet").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentValue(currentUser->firstChildElement("spreadsheet").
                             firstChildElement("columns"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(QString("%1").arg(count)));
@@ -436,7 +424,10 @@ void CFGManager::setColumnCount(int count)
 
 void CFGManager::setRefreshTime(int seconds)
 {
-    QDomElement currentValue(root->firstChildElement("spreadsheet").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentValue(currentUser->firstChildElement("spreadsheet").
                             firstChildElement("refresh_time"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(QString("%1").arg(seconds)));
@@ -444,7 +435,10 @@ void CFGManager::setRefreshTime(int seconds)
 
 void CFGManager::setSelectionMode(const QString &mode)
 {
-    QDomElement currentValue(root->firstChildElement("spreadsheet").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentValue(currentUser->firstChildElement("spreadsheet").
                             firstChildElement("selection_mode"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(mode));
@@ -452,12 +446,15 @@ void CFGManager::setSelectionMode(const QString &mode)
 
 void CFGManager::setCellsSize(const QSize &size)
 {
-    QDomElement currentHeight(root->firstChildElement("spreadsheet").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentHeight(currentUser->firstChildElement("spreadsheet").
                             firstChildElement("row_height"));
     currentHeight.removeChild(currentHeight.firstChild());
     currentHeight.appendChild(domDoc->createTextNode(QString("%1").arg(size.height())));
 
-    QDomElement currentWidth(root->firstChildElement("spreadsheet").
+    QDomElement currentWidth(currentUser->firstChildElement("spreadsheet").
                             firstChildElement("column_width"));
     currentWidth.removeChild(currentWidth.firstChild());
     currentWidth.appendChild(domDoc->createTextNode(QString("%1").arg(size.width())));
@@ -465,7 +462,10 @@ void CFGManager::setCellsSize(const QSize &size)
 
 void CFGManager::setRowHeight(int height)
 {
-    QDomElement currentHeight(root->firstChildElement("spreadsheet").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentHeight(currentUser->firstChildElement("spreadsheet").
                             firstChildElement("row_height"));
     currentHeight.removeChild(currentHeight.firstChild());
     currentHeight.appendChild(domDoc->createTextNode(QString("%1").arg(height)));
@@ -473,54 +473,31 @@ void CFGManager::setRowHeight(int height)
 
 void CFGManager::setColumnWidth(int width)
 {
-    QDomElement currentWidth(root->firstChildElement("spreadsheet").
+    if (currentUser == 0)
+        return;
+
+    QDomElement currentWidth(currentUser->firstChildElement("spreadsheet").
                             firstChildElement("column_width"));
     currentWidth.removeChild(currentWidth.firstChild());
     currentWidth.appendChild(domDoc->createTextNode(QString("%1").arg(width)));
 }
 
-void CFGManager::setLoginData(const QString &name, bool rmb,
-                              const QString &password)
+void CFGManager::setKey(const QString &key) const
 {
-    QDomElement currentValue(root->firstChildElement("security").
-                            firstChildElement("login_name"));
-    currentValue.removeChild(currentValue.firstChild());
-    currentValue.appendChild(domDoc->createTextNode(name));
+    //if (currentUser == 0)
+      //  return;
 
-    QDomElement currentValue2(root->firstChildElement("security").
-                            firstChildElement("login_password"));
-    currentValue2.removeChild(currentValue2.firstChild());
-    currentValue2.appendChild(domDoc->createTextNode(password));
-
-    QDomElement currentValue3(root->firstChildElement("security").
-                            firstChildElement("pass_remember"));
-    currentValue3.removeChild(currentValue3.firstChild());
-    currentValue3.appendChild(domDoc->createTextNode(rmb?"true":"false"));
-
-    saveDoc();
-}
-
-void CFGManager::setKey(const QString &key)
-{
-    if (key.length() != 32)
+    /*
+    if (key.length() != 256)
     {
-        emit errorMessage("Invalid key size (must be 32)");
+        emit errorMessage("Invalid key size (must be 256)");
         return;
-    }
+    }*/
 
-    QDomElement currentValue(root->firstChildElement("security").
+    QDomElement currentValue(currentUser->firstChildElement("security").
                             firstChildElement("key"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(key));
-}
 
-void CFGManager::setPKey(const QString &key) const
-{
-    if (key.length() != 32)
-    {
-        emit errorMessage("Invalid key size (must be 32)");
-        return;
-    }
-    pKey->clear();
-    pKey->append(key);
+    saveDoc();
 }

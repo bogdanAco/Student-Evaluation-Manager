@@ -45,12 +45,7 @@ ConfigurationDialog::~ConfigurationDialog()
     delete spreadSheetTab;
 
     //security items
-    delete key;
-    delete pKey;
-    delete initialKey;
-    delete initialPKey;
-    delete generateKeyButton;
-    delete generatePKeyButton;
+    delete generateKeysButton;
     delete securityLayout;
     delete securityTab;
 
@@ -212,63 +207,29 @@ void ConfigurationDialog::createSecurityTab()
     securityLayout = new QVBoxLayout();
     securityLayout->setAlignment(Qt::AlignTop);
 
-    securityLayout->addWidget(new QLabel("General encryption key:"));
-    key = new QLineEdit(cfg->getKey());
-    initialKey = new QString(key->text());
-    securityLayout->addWidget(key);
-    connect(key, SIGNAL(textChanged(QString)),
-            cfg, SLOT(setKey(QString)));
-
-    securityLayout->addWidget(new QLabel("Personal data "
-                                         "encryption key:"));
-    pKey = new QLineEdit(cfg->getPKey(cfg->getLoginUser()));
-    initialPKey = new QString(pKey->text());
-    securityLayout->addWidget(pKey);
-    connect(pKey, SIGNAL(textChanged(QString)),
-            cfg, SLOT(setPKey(QString)));
-
-    securityLayout->addWidget(new QLabel("Generate random general key:"));
-    generateKeyButton = new QPushButton("Generate general key");
-    generateKeyButton->setFixedWidth(150);
-    securityLayout->addWidget(generateKeyButton);
-    connect(generateKeyButton, SIGNAL(pressed()),
-            this, SLOT(generateKey()));
-
-    securityLayout->addWidget(new QLabel("Generate random personal key:"));
-    generatePKeyButton = new QPushButton("Generate personal key");
-    generatePKeyButton->setFixedWidth(150);
-    securityLayout->addWidget(generatePKeyButton);
-    connect(generatePKeyButton, SIGNAL(pressed()),
-            this, SLOT(generatePKey()));
-
-    connect(this, SIGNAL(okPressed()),
-            this, SLOT(emitPKeyChanged()));
-    connect(this, SIGNAL(okPressed()),
-            this, SLOT(emitKeyChanged()));
+    securityLayout->addWidget(new QLabel("Generate new random keys:"));
+    generateKeysButton = new QPushButton("Generate");
+    generateKeysButton->setFixedWidth(150);
+    securityLayout->addWidget(generateKeysButton);
+    connect(generateKeysButton, SIGNAL(pressed()),
+            this, SLOT(generateKeys()));
 
     securityTab->setLayout(securityLayout);
 }
 
-void ConfigurationDialog::emitKeyChanged()
+void ConfigurationDialog::prepareKeysGeneration()
 {
-    if (initialKey->compare(key->text(), Qt::CaseSensitive) == 0)
-        return;
-    emit changeKey(*initialKey, key->text());
+    UserLoginDialog *d = new UserLoginDialog(this);
+    connect(d, SIGNAL(saveLoginDataSignal(QString,QString)),
+            this, SLOT(generateKeys(QString,QString)));
+    connect(d, SIGNAL(saveLoginDataSignal(QString,QString)),
+            d, SLOT(hide()));
 }
 
-void ConfigurationDialog::emitPKeyChanged()
+void ConfigurationDialog::generateKeys(const QString &name, const QString &pass)
 {
-    if (initialPKey->compare(pKey->text(), Qt::CaseSensitive) == 0)
-        return;
-    emit changePKey(*initialPKey, pKey->text());
-}
-
-void ConfigurationDialog::generateKey()
-{
-    key->setText(Security::generateKey());
-}
-
-void ConfigurationDialog::generatePKey()
-{
-    pKey->setText(Security::generateKey());
+    QString decryptKey = Security::getHash(name+pass);
+    QPair<QString,QString> keys = Security::generateKeyPair(decryptKey);
+    emit changeKeys(Security::AESDecrypt(cfg->getKey(), decryptKey),
+                    keys.first, keys.second);
 }

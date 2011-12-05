@@ -86,10 +86,7 @@ class UserLoginDialog : public Dialog
 {
     Q_OBJECT
 public:
-    UserLoginDialog(const QString &name,
-                    const QString &pass,
-                    bool rmb,
-                    QWidget *parent = 0);
+    UserLoginDialog(QWidget *parent = 0);
     void showMessage(const QString &msg);
     ~UserLoginDialog();
 
@@ -97,12 +94,11 @@ protected:
     QLineEdit *usrnm;
     QLabel *password;
     QLineEdit *passwd;
-    QCheckBox *remember;
 
 signals:
     void dataChecked(const QString &name,
                      const QString &password);
-    void saveLoginDataSignal(const QString &name, bool rmb,
+    void saveLoginDataSignal(const QString &name,
                              const QString &password);
 protected slots:
     virtual void checkData();
@@ -117,20 +113,12 @@ public:
     UserSignInDialog(QWidget *parent = 0);
     ~UserSignInDialog();
 
-private:
-    QLineEdit *pKey;
-    QPushButton *generatePKey;
-
 private slots:
-    void showGeneratedKey();
     void checkData();
 
 signals:
     void dataChecked(const QString &name,
-                     const QString &password,
-                     const QString &key);
-    void generateKeyFile(const QString &user,
-                         const QString &key);
+                     const QString &pass);
 };
 
 class ErrorDialog : public Dialog

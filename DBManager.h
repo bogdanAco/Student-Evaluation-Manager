@@ -45,6 +45,7 @@ signals:
 
 private:
     int current_user_id;
+    int current_table_id;
     QSqlDatabase db;
     QSqlQuery *query;
     QString *current_table;
@@ -64,8 +65,7 @@ public slots:
                   int rows, const QString &folder);
 
     void login(const QString& uname, const QString& pass);
-    void createUser(const QString &uname, const QString &pass,
-                    const QString &key);
+    void createUser(const QString &uname, const QString &pass);
 
     void grantRights(const QList<int> columns,
                      const QString &username);
@@ -80,8 +80,9 @@ public slots:
     void removeFolder(const QString &name);
     void removeTable(const QString& name);
 
-    void changeKey(const QString &oldKey, const QString &key);
-    void changePKey(const QString &oldKey, const QString &pKey);
+    void changeKey(const QString &oldPrivateKey,
+                   const QString &publicKey,
+                   const QString &privateKey);
 };
 
 #endif // DBMANAGER_H

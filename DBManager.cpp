@@ -18,8 +18,9 @@ DBManager::DBManager(const CFGManager *cfg)
 
     current_table = new QString();
     current_user_id = -1;
+    current_table_id = -1;
 
-    security = new Security(this->cfg->getKey());
+    security = new Security();
 }
 
 void DBManager::setCurrentSpreadSheet(const SpreadSheet *spreadsheet)
@@ -57,6 +58,7 @@ void DBManager::setCurrentSpreadSheet(const SpreadSheet *spreadsheet)
 void DBManager::removeCurrentData()
 {
     current_table->clear();
+    current_table_id = -1;
 }
 
 void DBManager::initializeDatabase()
@@ -152,16 +154,9 @@ void DBManager::login(const QString& uname, const QString& pass)
         return;
     }
 
-    QString userKey = cfg->getPKey(uname);
-    if (userKey == "")
-    {
-        emit queryError("Unable to open user's key file");
-        return;
-    }
-
-    QString username = security->encryptData(uname, userKey);
-    QString password = security->encryptData(pass, userKey);
-    query->prepare("SELECT user_id, user_name, passwd "
+    QString username = Security::getHash(uname);
+    QString password = Security::getHash(pass);
+    query->prepare("SELECT user_id, user_name, passwd, public_key "
                    "FROM users "
                    "WHERE user_name=:usr AND passwd=:pass");
     query->bindValue(":usr",username);
@@ -177,8 +172,16 @@ void DBManager::login(const QString& uname, const QString& pass)
         return;
     }
 
+    QString aesKey = Security::getHash(uname+pass);
+    security->setAESkey(aesKey);
     while (query->next())
+    {
+        security->setRSAkeys(query->value(3).toString(),
+                             cfg->getKey(), aesKey);
+        //security->setRSAkeys(query->value(3).toString(),
+          //                   security->AESDecrypt(cfg->getKey()));
         current_user_id = query->value(0).toInt();
+    }
 
     query->prepare("SELECT backup_name "
                    "FROM backup "
@@ -211,12 +214,11 @@ void DBManager::login(const QString& uname, const QString& pass)
     emit loggedIn(current_user_id);
 }
 
-void DBManager::createUser(const QString &uname, const QString &pass,
-                           const QString &key)
+void DBManager::createUser(const QString &uname, const QString &pass)
 {
-    QString username = security->encryptData(uname, key);
-    QString password = security->encryptData(pass, key);
-    query->prepare("SELECT * "
+    QString username = Security::getHash(uname);
+    QString password = Security::getHash(pass);
+    query->prepare("SELECT user_id "
                    "FROM users "
                    "WHERE user_name=:usr");
     query->bindValue(":usr",username);
@@ -242,11 +244,17 @@ void DBManager::createUser(const QString &uname, const QString &pass,
     while (query->next())
         uid = query->value(0).toInt();
 
+    QString passphr = Security::getHash(username+password);
+    QPair<QString, QString> keys = Security::generateKeyPair(passphr);
+    cfg->setCurrentUser(username);
+    cfg->setKey(keys.second);
+
     query->prepare("INSERT INTO users "
-                   "VALUES (:uid, :usr, :pass)");
+                   "VALUES (:uid, :usr, :pass, :pubkey)");
     query->bindValue(":uid", uid+1);
     query->bindValue(":usr", username);
     query->bindValue(":pass", password);
+    query->bindValue(":pubkey", keys.first);
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
@@ -260,13 +268,16 @@ void DBManager::createUser(const QString &uname, const QString &pass,
         emit queryError("Please check your database connection");
         return;
     }
+    security->setAESkey(passphr);
+    security->setRSAkeys(keys.first, keys.second, passphr);
+    //cfg->setKey(security->AESEncrypt(keys.second));
 
     emit userCreated();
 }
 
 void DBManager::grantRights(const QList<int> columns, const QString &username)
 {
-    QString encUsername = security->encryptData(username);
+    QString encUsername = Security::getHash(username);
     query->prepare("SELECT user_id FROM users "
                    "WHERE user_name=:name");
     query->bindValue(":name", encUsername);
@@ -275,24 +286,46 @@ void DBManager::grantRights(const QList<int> columns, const QString &username)
         emit queryError("Please check your database connection");
         return;
     }
+    if (query->size() == 0)
+    {
+        emit queryError("User does not exist");
+        return;
+    }
 
     int uid = -1;
     while (query->next())
         uid = query->value(0).toInt();
 
+    query->prepare("SELECT access_key "
+                   "FROM access_keys "
+                   "WHERE table_id=:table "
+                   "AND user_id=:uid");
+    query->bindValue(":table", current_table_id);
+    query->bindValue(":uid", uid);
+    if (!query->exec())
+    {
+        emit queryError("Please check your database connection");
+        return;
+    }
+    if (query->size() == 0)
+    {
+        emit queryError("User does not have read access on this table");
+        return;
+    }
+
     for (int i=0; i<columns.length(); i++)
     {
         query->exec(QString("SELECT * FROM rights "
-                            "WHERE table_name='%1'"
+                            "WHERE table_id='%1'"
                             "AND user_id=%2 "
                             "AND column_id=%3").
-                    arg(*current_table).arg(uid).arg(columns.at(i)));
+                    arg(current_table_id).arg(uid).arg(columns.at(i)));
         if (query->size() > 0)
             continue;
 
         if (!query->exec(QString("INSERT INTO rights "
-                            "VALUES ('%1', %2, %3)").
-                    arg(*current_table).arg(uid).arg(columns.at(i))))
+                            "VALUES (%1, %2, %3)").
+                    arg(current_table_id).arg(uid).arg(columns.at(i))))
         {
             emit queryError("Please check your database connection");
             return;
@@ -307,7 +340,7 @@ bool DBManager::writeData(int line, int column, const QString& cell_data)
 {
     QString dataToWrite;
     (cell_data == "")?(dataToWrite = ""):
-            (dataToWrite = security->encryptData(cell_data));
+            (dataToWrite = security->AESEncrypt(cell_data));
 
     query->prepare(QString("SELECT row_index FROM %1 "
                            "WHERE row_index = %2")
@@ -424,7 +457,7 @@ void DBManager::getData()
             QString data = query->value(i).toString();
             QString decryptedData;
             (data == "")?(decryptedData = ""):
-                    (decryptedData = security->decryptData(data));
+                    (decryptedData = security->AESDecrypt(data));
             aux.append(decryptedData+"\n");
         }
         aux.remove(aux.length()-1, 1);
@@ -438,9 +471,9 @@ void DBManager::getData()
     QList<int> writable_columns = QList<int>();
     query->prepare("SELECT column_id "
                    "FROM rights "
-                   "WHERE table_name=:tname "
+                   "WHERE table_id=:tid "
                    "AND user_id=:uid");
-    query->bindValue(":tname", *current_table);
+    query->bindValue(":tid", current_table_id);
     query->bindValue(":uid", current_user_id);
     if (!query->exec())
     {
@@ -453,8 +486,8 @@ void DBManager::getData()
     QMap<int,int> columns_width = QMap<int,int>();
     query->prepare("SELECT column_id, width "
                    "FROM tables_size "
-                   "WHERE table_name=:tname");
-    query->bindValue(":tname", *current_table);
+                   "WHERE table_id=:tid");
+    query->bindValue(":tid", current_table_id);
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
@@ -499,7 +532,7 @@ void DBManager::getData(const QString &table, int row, int column,
 
     QString data = QString("=link(%1;%2;%3;%4)").
                    arg(table).arg(row).arg(column).
-                   arg(security->decryptData(aux));
+                   arg(security->AESDecrypt(aux));
     emit dataLoaded(destRow, destCol, data);
 }
 
@@ -523,7 +556,7 @@ void DBManager::getGivenData(int field, const QString &fieldVal,
     query->prepare(QString("SELECT * FROM %1 "
                            "WHERE field%2=:val").
                    arg(aux).arg(field));
-    query->bindValue(":val", security->encryptData(fieldVal));
+    query->bindValue(":val", security->AESEncrypt(fieldVal));
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
@@ -546,7 +579,7 @@ void DBManager::getGivenData(int field, const QString &fieldVal,
             QString decryptedData;
             QString data = query->value(i).toString();
             (data == "")?(decryptedData = ""):
-                    (decryptedData = security->decryptData(data));
+                    (decryptedData = security->AESDecrypt(data));
 
             current_data.append(decryptedData);
         }
@@ -615,19 +648,35 @@ void DBManager::createTable(const QString &name, int columns,
         return;
     }
     current_table = new QString(tableName);
+    current_table_id = current_index;
+
+    query->prepare("INSERT INTO access_keys "
+                   "VALUES (:tid, :uid, :key)");
+    query->bindValue(":tid", current_table_id);
+    query->bindValue(":uid", current_user_id);
+    query->bindValue(":key", security->RSAEncrypt(Security::generateAESKey()));
+    if (!query->exec())
+    {
+        emit queryError("Please check your database connection");
+        return;
+    }
 
     for (int i=0; i<columns; i++)
-        query->exec(QString("INSERT INTO rights "
-                            "VALUES ('%1', %2, %3)").arg(tableName).
-                                arg(current_user_id).arg(i));
+        if (!query->exec(QString("INSERT INTO rights "
+                                 "VALUES ('%1', %2, %3)").arg(tableName).
+                                            arg(current_user_id).arg(i)))
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
 
     emit tableCreated(tableName, columns, rows);
 }
 
 void DBManager::openTable(const QString &name, int columns,
               int rows, const QString &folder)
-{
-    query->prepare("SELECT table_name, row_count FROM files "
+{   
+    query->prepare("SELECT table_name, row_count, file_id FROM files "
                    "WHERE file_name = :name");
     query->bindValue(":name", name);
     if (!query->exec())
@@ -639,7 +688,25 @@ void DBManager::openTable(const QString &name, int columns,
     while (query->next())
     {
         current_table = new QString(query->value(0).toString());
+        current_table_id = query->value(2).toInt();
         row_count = query->value(1).toInt();
+    }
+
+    query->prepare("SELECT access_key "
+                   "FROM access_keys "
+                   "WHERE table_id=:tid "
+                   "AND user_id=_uid");
+    query->bindValue(":tid", current_table_id);
+    query->bindValue(":uid", current_user_id);
+    if (!query->exec())
+    {
+        emit queryError("Please check your database connection");
+        return;
+    }
+    if (query->size() == 0)
+    {
+        emit queryError("You don't have rights for reading this table");
+        return;
     }
 
     if (!query->exec(QString("SELECT * FROM %1").arg(*current_table)))
@@ -731,10 +798,10 @@ void DBManager::removeColumns(const QList <int> column_ids)
         }
 
         q = QString("DELETE FROM rights "
-                    "WHERE table_name='%1' "
-                    "AND user_id = %2 "
-                    "AND column_id = %3").
-                    arg(*current_table).arg(current_user_id).arg(column_ids.at(i));
+                    "WHERE table_id=%1 "
+                    "AND user_id=%2 "
+                    "AND column_id=%3").
+                    arg(current_table_id).arg(current_user_id).arg(column_ids.at(i));
         if (!query->exec(q))
         {
             emit queryError("Please check your database connection");
@@ -794,11 +861,11 @@ void DBManager::setColumnWidth(int column, int oldSize, int newSize)
 {
     query->prepare("UPDATE tables_size "
                    "SET width=:nw "
-                   "WHERE table_name=:tname "
+                   "WHERE table_id=:tid "
                    "AND column_id=:col "
                    "AND width <> :ow");
     query->bindValue(":nw", newSize);
-    query->bindValue(":tname", *current_table);
+    query->bindValue(":tid", current_table_id);
     query->bindValue(":col", column);
     query->bindValue(":ow", oldSize);
     if (!query->exec())
@@ -1050,7 +1117,7 @@ void DBManager::removeTable(const QString& name)
             emit queryError("Please check your database connection");
             return;
         }
-        q = QString("DELETE FROM rights WHERE table_name='%1'").arg(tableName);
+        q = QString("DELETE FROM rights WHERE table_id=%1").arg(file_id);
         if (!query->exec(q))
         {
             emit queryError("Please check your database connection");
@@ -1086,24 +1153,74 @@ void DBManager::removeTable(const QString& name)
     emit dataModified(getTables(), getFolders());
 }
 
-void DBManager::changeKey(const QString &oldKey,
-                          const QString &key)
+void DBManager::changeKey(const QString &oldPrivateKey,
+                          const QString &publicKey,
+                          const QString &privateKey)
 {
-    if (key.length() != 32)
+    if (publicKey.length() != 256 || privateKey.length() != 256)
     {
-        emit message("Invalid key size (must be 32)");
+        emit message("Invalid key size (must be 256)");
+        return;
+    }
+    security->setRSAkeys(publicKey, privateKey, "");
+
+    query->prepare("UPDATE users "
+                   "SET public_key=:key "
+                   "WHERE user_id=:uid");
+    query->bindValue(":key", publicKey);
+    query->bindValue(":uid", current_user_id);
+    if (!query->exec())
+    {
+        emit queryError("Please check your database connection");
         return;
     }
 
-    if (!query->exec("SELECT table_name FROM files"))
+    query->prepare("SELECT access_key "
+                   "FROM access_keys "
+                   "WHERE user_id=:uid");
+    query->bindValue(":uid", current_user_id);
+    if (!query->exec())
+    {
+        emit queryError("Please check your database connection");
+        return;
+    }
+    QStringList accessKeys = QStringList();
+    while (query->next())
+        accessKeys.append(query->value(0).toString());
+    for (int i=0; i<accessKeys.length(); i++)
+    {
+        query->prepare("UPDATE access_keys "
+                       "SET access_key=:newKey "
+                       "WHERE user_id=:uid");
+        query->bindValue(":newKey", security->RSAEncrypt(
+                             Security::RSADecrypt(accessKeys.at(i),
+                                                  oldPrivateKey)));
+        query->bindValue(":uid", current_user_id);
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            continue;
+        }
+    }
+
+    query->prepare("SELECT f.table_name, k.access_key "
+                   "FROM files f, access_keys k "
+                   "WHERE f.owner=:uid "
+                   "AND k.table_id=f.file_id");
+    query->bindValue(":uid", current_user_id);
+    if (!query->exec())
     {
         emit queryError("Please check your database connection");
         return;
     }
 
     QStringList tables = QStringList();
+    QStringList keys = QStringList();
     while (query->next())
+    {
         tables.append(query->value(0).toString());
+        keys.append(security->RSADecrypt(query->value(1).toString()));
+    }
 
     QList<QStringList> encryptedData = QList<QStringList>();
     for (int i=0; i<tables.length(); i++)
@@ -1127,8 +1244,8 @@ void DBManager::changeKey(const QString &oldKey,
                     encryptedRow.append("");
                 else
                 {
-                    QString decrypted = security->decryptData(data, oldKey);
-                    encryptedRow.append(security->encryptData(decrypted, key));
+                    QString decrypted = Security::AESDecrypt(data, keys.at(i));
+                    encryptedRow.append(Security::AESEncrypt(decrypted, keys.at(i)));
                 }
             }
             encryptedData.append(encryptedRow);
@@ -1159,55 +1276,4 @@ void DBManager::changeKey(const QString &oldKey,
             }
         }
     }
-
-    security->loadKey(key);
-}
-
-void DBManager::changePKey(const QString &oldKey,
-                           const QString &pKey)
-{
-    if (pKey.length() != 32)
-    {
-        emit message("Invalid key size (must be 32)");
-        return;
-    }
-
-    query->prepare("SELECT user_name, passwd "
-                   "FROM users "
-                   "WHERE user_id=:uid");
-    query->bindValue(":user_id", current_user_id);
-    if (!query->exec())
-    {
-        emit queryError("Please check your database connection");
-        return;
-    }
-    if (query->size() <= 0)
-        return;
-
-    QString username, password;
-    while (query->next())
-    {
-        username = query->value(0).toString();
-        password = query->value(1).toString();
-    }
-
-    username = security->decryptData(username, oldKey);
-    password = security->decryptData(password, oldKey);
-
-    username = security->encryptData(username, pKey);
-    password = security->encryptData(password, pKey);
-
-    query->prepare("UPDATE users "
-                   "SET user_name=:usr, passwd=:pass "
-                   "WHERE user_id=:uid");
-    query->bindValue(":usr", username);
-    query->bindValue(":pass", password);
-    query->bindValue(":user_id", current_user_id);
-    if (!query->exec())
-    {
-        emit queryError("Please check your database connection");
-        return;
-    }
-
-    emit message("");
 }
