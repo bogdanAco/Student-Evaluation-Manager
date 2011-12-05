@@ -3,6 +3,20 @@
 
 #include "Dialog.h"
 
+class TreeItem : public QTreeWidgetItem
+{
+public:
+    enum TreeItemType { Table, Folder };
+    
+    TreeItem(TreeItemType type, QTreeWidget *parent = 0);
+    TreeItem(TreeItemType type, QTreeWidgetItem *parent = 0);
+    int getType();
+    
+private: 
+    void initialize(TreeItemType type);
+    TreeItemType type;
+};
+
 class TableDialog : public Dialog
 {
     Q_OBJECT
@@ -32,7 +46,7 @@ signals:
                           const QString &parent);
 protected:
     QTreeWidget *treeView;
-    QTreeWidgetItem *root;
+    TreeItem *root;
     QList<QTreeWidgetItem*> removeTreeItemChildren(QTreeWidgetItem* item);
     void createTreeView();
     QLineEdit *tableName;
@@ -41,6 +55,8 @@ protected:
     QAction *deleteFolderAction;
     QAction *createFolderAction;
     bool treeDataContains(const QString &string);
+    bool isFolder(TreeItem *item);
+    bool isTable(TreeItem *item);
     bool isFolder(const QString &nodeName);
     bool isTable(const QString &nodeName);
 };

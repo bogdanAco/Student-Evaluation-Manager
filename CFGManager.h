@@ -28,6 +28,7 @@ public:
     QSize getCellsSize() const;
     //security configuration
     QString getKey() const;
+    enum ErrorMessage { NoUser };
 
 private:
     QDomDocument *domDoc;
@@ -36,6 +37,7 @@ private:
     QFile *XMLFile;
 
 public slots:
+    void emitErrorMessage(ErrorMessage m) const;
     void setCurrentUser(const QString &name) const;
     void saveDoc() const;
     void undoDoc() const;

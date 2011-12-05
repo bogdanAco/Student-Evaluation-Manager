@@ -27,7 +27,8 @@ public:
     static QString RSAEncrypt(const QString &data,
                               const QString &pubkey);
     static QString RSADecrypt(const QString &data,
-                              const QString &prvkey);
+                              const QString &prvkey,
+                              const QString &passphrase);
     static QString getHash(const QString &text);
     static QString generateAESKey();
     static QPair<QString, QString>

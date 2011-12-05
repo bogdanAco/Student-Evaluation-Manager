@@ -1,5 +1,29 @@
 #include "TableDialog.h"
 
+TreeItem::TreeItem(TreeItemType type, QTreeWidget *parent) : QTreeWidgetItem(parent)
+{
+    initialize(type);
+}
+
+TreeItem::TreeItem(TreeItemType type, QTreeWidgetItem *parent) : QTreeWidgetItem(parent)
+{
+    initialize(type);
+}
+
+int TreeItem::getType()
+{
+    return this->type;
+}
+
+void TreeItem::initialize(TreeItemType type)
+{
+    this->type = type;
+    if (type == Table)
+        setIcon(0, QIcon("images/new.png"));
+    else if (type == Folder)
+        setIcon(0, QIcon("images/folder.png")); 
+}
+
 TableDialog::TableDialog(const QString &title, const QString &text,
                        QWidget* parent) : Dialog(title, text, parent)
 {
@@ -23,18 +47,14 @@ void TableDialog::loadTreeData(const QList<QPair<QString, QString> > &tables,
     for (int i=items.length()-1; i>=0; i--)
         delete items.at(i);
 
-    QIcon folder = QIcon("images/folder.png");
-    QIcon file = QIcon("images/new.png");
-    qint64 folder_key = folder.cacheKey();
-
     for (int i=0; i<folders.length(); i++)
     {
         QString folderName = folders.at(i).first;
         QString parentName = folders.at(i).second;
 
-        QTreeWidgetItem *item = 0;
+        TreeItem *item = 0;
         if (parentName == "")
-            item = new QTreeWidgetItem(root);
+            item = new TreeItem(TreeItem::Folder, root);
         else
         {
             QList<QTreeWidgetItem*> parentNodes = treeView->findItems(parentName,
@@ -42,11 +62,10 @@ void TableDialog::loadTreeData(const QList<QPair<QString, QString> > &tables,
                                                               Qt::MatchRecursive);
             if (parentNodes.length() <= 0)
                 continue;
-            item = new QTreeWidgetItem(parentNodes.at(0));
+            item = new TreeItem(TreeItem::Folder, parentNodes.at(0));
         }
         if (!item)
             continue;
-        item->setIcon(0, folder);
         item->setText(0, folderName);
         item->setExpanded(true);
     }
@@ -56,9 +75,9 @@ void TableDialog::loadTreeData(const QList<QPair<QString, QString> > &tables,
         QString tableName = tables.at(i).first;
         QString parentName = tables.at(i).second;
 
-        QTreeWidgetItem *item = 0;
+        TreeItem *item = 0;
         if (parentName == "Root")
-            item = new QTreeWidgetItem(root);
+            item = new TreeItem(TreeItem::Table, root);
         else
         {
             QList<QTreeWidgetItem*> parentNodes = treeView->findItems(parentName,
@@ -67,12 +86,11 @@ void TableDialog::loadTreeData(const QList<QPair<QString, QString> > &tables,
             if (parentNodes.length() <= 0)
                 continue;
             for (int n=0; n<parentNodes.length(); n++)
-                if (parentNodes.at(n)->icon(0).cacheKey() == folder_key)
-                    item = new QTreeWidgetItem(parentNodes.at(n));
+                if (((TreeItem*)parentNodes.at(n))->getType() == TreeItem::Folder)
+                    item =  new TreeItem(TreeItem::Table, parentNodes.at(n));
             if (!item)
                 continue;
         }
-        item->setIcon(0, file);
         item->setText(0, tableName);
     }
     treeView->sortItems(0, Qt::AscendingOrder);
@@ -94,7 +112,7 @@ void TableDialog::showSelectedItem()
     if (selectedItem != 0)
     {
         QString selectedItemName = selectedItem->text(0);
-        if (isTable(selectedItemName))
+        if (isTable((TreeItem*)selectedItem))
             tableName->setText(selectedItemName);
         else
             tableName->setText("");
@@ -111,7 +129,7 @@ void TableDialog::deleteTable()
         return;
     }
     QString selectedItemName = selectedItem->text(0);
-    if (isFolder(selectedItemName) ||
+    if (isFolder((TreeItem*)selectedItem) ||
         selectedItemName.length() == 0)
     {
         showMessage("No table selected");
@@ -132,7 +150,7 @@ void TableDialog::deleteFolder()
         return;
     }
     QString selectedItemName = selectedItem->text(0);
-    if (isTable(selectedItemName) ||
+    if (isTable((TreeItem*)selectedItem) ||
         selectedItemName.length() == 0)
     {
         showMessage("No folder selected");
@@ -175,7 +193,7 @@ void TableDialog::createFolder(const QString &name)
     else
     {
         QTreeWidgetItem *item = treeView->currentItem();
-        if (isTable(item->text(0)))
+        if (isTable((TreeItem*)item))
             emit okToCreateFolder(name, item->parent()->text(0));
         else
             emit okToCreateFolder(name, item->text(0));
@@ -202,7 +220,7 @@ void TableDialog::createTreeView()
     treeView->setContextMenuPolicy(Qt::ActionsContextMenu);
     mainLayout->addWidget(treeView, 8, 0, 1, 4);
 
-    root = new QTreeWidgetItem(treeView);
+    root = new TreeItem(TreeItem::Folder, treeView);
     root->setIcon(0, QIcon("images/folder.png"));
     root->setText(0, "Root");
     root->setExpanded(true);
@@ -236,28 +254,40 @@ bool TableDialog::treeDataContains(const QString &string)
     return false;
 }
 
+bool TableDialog::isFolder(TreeItem *item)
+{
+    if (item->getType() == TreeItem::Folder)
+        return true;
+    else
+        return false;
+}
+
+bool TableDialog::isTable(TreeItem *item)
+{
+    if (item->getType() == TreeItem::Table)
+        return true;
+    else
+        return false;
+}
+
 bool TableDialog::isFolder(const QString &nodeName)
 {
-    QIcon folder = QIcon("images/folder.png");
-    qint64 folder_key = folder.cacheKey();
     QList<QTreeWidgetItem*> findResult = treeView->findItems(nodeName,
                                                       Qt::MatchExactly |
                                                       Qt::MatchRecursive);
     for (int n=0; n<findResult.length(); n++)
-        if (findResult.at(n)->icon(0).cacheKey() == folder_key)
+        if (((TreeItem*)findResult.at(n))->getType() == TreeItem::Folder)
             return true;
     return false;
 }
 
 bool TableDialog::isTable(const QString &nodeName)
 {
-    QIcon file = QIcon("images/new.png");
-    qint64 file_key = file.cacheKey();
     QList<QTreeWidgetItem*> findResult = treeView->findItems(nodeName,
                                                       Qt::MatchExactly |
                                                       Qt::MatchRecursive);
     for (int n=0; n<findResult.length(); n++)
-        if (findResult.at(n)->icon(0).cacheKey() == file_key)
+        if (((TreeItem*)findResult.at(n))->getType() == TreeItem::Table)
             return true;
     return false;
 }
@@ -321,7 +351,7 @@ void NewTableDialog::checkValidity()
         showMessage("No folder selected");
         return;
     }
-    if (isTable(treeView->selectedItems().at(0)->text(0)))
+    if (isTable((TreeItem*)treeView->selectedItems().at(0)))
     {
         showMessage("Invalid folder selected");
         return;

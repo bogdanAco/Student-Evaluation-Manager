@@ -228,8 +228,7 @@ void ConfigurationDialog::prepareKeysGeneration()
 
 void ConfigurationDialog::generateKeys(const QString &name, const QString &pass)
 {
-    QString decryptKey = Security::getHash(name+pass);
-    QPair<QString,QString> keys = Security::generateKeyPair(decryptKey);
-    emit changeKeys(Security::AESDecrypt(cfg->getKey(), decryptKey),
-                    keys.first, keys.second);
+    QString passphrase = Security::getHash(name+pass);
+    QPair<QString,QString> keys = Security::generateKeyPair(passphrase);
+    emit changeKeys(cfg->getKey(), keys.first, keys.second, passphrase);
 }

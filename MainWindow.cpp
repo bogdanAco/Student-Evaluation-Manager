@@ -600,10 +600,12 @@ void MainWindow::createConfigureAppDialog()
 {
     delete dialog;
     dialog = new ConfigurationDialog(config, this);
-    connect((ConfigurationDialog*)dialog, SIGNAL(changeKey(QString,QString)),
-            DBcon, SLOT(changeKey(QString,QString)));
     connect(DBcon, SIGNAL(message(QString)),
             dialog, SLOT(showMessage(QString)));
+    connect((ConfigurationDialog*)dialog, 
+            SIGNAL(changeKeys(QString,QString,QString,QString)),
+            DBcon, 
+            SLOT(changeKey(QString,QString,QString,QString)));
     dialog->show();
 }
 

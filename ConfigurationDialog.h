@@ -54,7 +54,8 @@ private slots:
 signals:
     void changeKeys(const QString &oldPrivateKey,
                     const QString &publicKey,
-                    const QString &privateKey);
+                    const QString &privateKey,
+                    const QString &passphrase);
 };
 
 #endif // CONFIGURATIONDIALOG_H

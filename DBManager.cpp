@@ -172,14 +172,11 @@ void DBManager::login(const QString& uname, const QString& pass)
         return;
     }
 
-    QString aesKey = Security::getHash(uname+pass);
-    security->setAESkey(aesKey);
+    QString passphrase = Security::getHash(uname+pass);
     while (query->next())
     {
         security->setRSAkeys(query->value(3).toString(),
-                             cfg->getKey(), aesKey);
-        //security->setRSAkeys(query->value(3).toString(),
-          //                   security->AESDecrypt(cfg->getKey()));
+                             cfg->getKey(), passphrase);
         current_user_id = query->value(0).toInt();
     }
 
@@ -268,9 +265,7 @@ void DBManager::createUser(const QString &uname, const QString &pass)
         emit queryError("Please check your database connection");
         return;
     }
-    security->setAESkey(passphr);
     security->setRSAkeys(keys.first, keys.second, passphr);
-    //cfg->setKey(security->AESEncrypt(keys.second));
 
     emit userCreated();
 }
@@ -536,6 +531,7 @@ void DBManager::getData(const QString &table, int row, int column,
     emit dataLoaded(destRow, destCol, data);
 }
 
+//CORECTARE: NUMAI PENTRU UTILIZATORI CU ACCESS LA TABELA
 void DBManager::getGivenData(int field, const QString &fieldVal,
                              const QString &table)
 {
@@ -654,7 +650,9 @@ void DBManager::createTable(const QString &name, int columns,
                    "VALUES (:tid, :uid, :key)");
     query->bindValue(":tid", current_table_id);
     query->bindValue(":uid", current_user_id);
-    query->bindValue(":key", security->RSAEncrypt(Security::generateAESKey()));
+    QString aesKey = Security::generateAESKey();
+    query->bindValue(":key", security->RSAEncrypt(aesKey));
+    security->setAESkey(aesKey);
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
@@ -708,6 +706,8 @@ void DBManager::openTable(const QString &name, int columns,
         emit queryError("You don't have rights for reading this table");
         return;
     }
+    while (query->next())
+        security->setAESkey(security->RSADecrypt(query->value(0).toString()));
 
     if (!query->exec(QString("SELECT * FROM %1").arg(*current_table)))
         return;
@@ -1153,16 +1153,12 @@ void DBManager::removeTable(const QString& name)
     emit dataModified(getTables(), getFolders());
 }
 
-void DBManager::changeKey(const QString &oldPrivateKey,
-                          const QString &publicKey,
-                          const QString &privateKey)
+void DBManager::changeKey(const QString &oldPrivateKey, 
+                          const QString &publicKey, 
+                          const QString &privateKey, 
+                          const QString &passphrase)
 {
-    if (publicKey.length() != 256 || privateKey.length() != 256)
-    {
-        emit message("Invalid key size (must be 256)");
-        return;
-    }
-    security->setRSAkeys(publicKey, privateKey, "");
+    security->setRSAkeys(publicKey, privateKey, passphrase);
 
     query->prepare("UPDATE users "
                    "SET public_key=:key "
@@ -1194,7 +1190,8 @@ void DBManager::changeKey(const QString &oldPrivateKey,
                        "WHERE user_id=:uid");
         query->bindValue(":newKey", security->RSAEncrypt(
                              Security::RSADecrypt(accessKeys.at(i),
-                                                  oldPrivateKey)));
+                                                  oldPrivateKey,
+                                                  passphrase)));
         query->bindValue(":uid", current_user_id);
         if (!query->exec())
         {
@@ -1222,6 +1219,8 @@ void DBManager::changeKey(const QString &oldPrivateKey,
         keys.append(security->RSADecrypt(query->value(1).toString()));
     }
 
+    
+    
     QList<QStringList> encryptedData = QList<QStringList>();
     for (int i=0; i<tables.length(); i++)
     {

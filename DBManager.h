@@ -82,7 +82,8 @@ public slots:
 
     void changeKey(const QString &oldPrivateKey,
                    const QString &publicKey,
-                   const QString &privateKey);
+                   const QString &privateKey,
+                   const QString &passphrase);
 };
 
 #endif // DBMANAGER_H

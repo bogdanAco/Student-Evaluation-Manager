@@ -70,14 +70,11 @@ QString Security::AESDecrypt(const QString &data) const
 bool Security::setRSAkeys(const QString &pubkey, const QString &prvkey,
                           const QString &passphrase)
 {
-    if (pubkey.length() != 256 || prvkey.length() != 256 ||
-            passphrase.length() != 256 || !QCA::isSupported("pkey"))
+    if (passphrase.length() != 64 || !QCA::isSupported("pkey"))
         return false;
 
     delete this->RSApublic;
     delete this->RSAprivate;
-    //RSApublic = new QCA::PublicKey(QCA::hexToArray(pubkey));
-    //RSAprivate = new QCA::PrivateKey(QCA::hexToArray(prvkey));
     QCA::ConvertResult res;
     RSApublic = new QCA::PublicKey(QCA::PublicKey::fromDER(pubkey.toAscii(), &res));
     if (!QCA::ConvertGood == res)
@@ -161,11 +158,12 @@ QString Security::AESDecrypt(const QString &data, const QString &key)
 QString Security::RSAEncrypt(const QString &data, const QString &pubkey)
 {
     QCA::Initializer init;
-    if (pubkey.length() != 256 || !QCA::isSupported("pkey"))
+    if (!QCA::isSupported("pkey"))
         return "";
 
-    QCA::PublicKey key = QCA::PublicKey(QCA::hexToArray(pubkey));
-    if (!key.canEncrypt())
+    QCA::ConvertResult res;
+    QCA::PublicKey key = QCA::PublicKey(QCA::PublicKey::fromDER(pubkey.toAscii(), &res));
+    if (!QCA::ConvertGood == res || !key.canEncrypt())
         return "";
 
     QCA::SecureArray dataToEncrypt = data.toAscii();
@@ -174,14 +172,18 @@ QString Security::RSAEncrypt(const QString &data, const QString &pubkey)
     return QString(qPrintable(QCA::arrayToHex(result.toByteArray())));
 }
 
-QString Security::RSADecrypt(const QString &data, const QString &prvkey)
+QString Security::RSADecrypt(const QString &data, const QString &prvkey, const QString &passphrase)
 {
     QCA::Initializer init;
-    if (prvkey.length() != 256 || !QCA::isSupported("pkey"))
+    if (passphrase.length() != 64 || !QCA::isSupported("pkey"))
         return "";
 
-    QCA::PrivateKey key = QCA::PrivateKey(QCA::hexToArray(prvkey));
-    if (!key.canDecrypt())
+    QCA::ConvertResult res;
+    QCA::PrivateKey key = QCA::PrivateKey(QCA::PrivateKey::fromDER(
+                                              QCA::SecureArray(prvkey.toAscii()),
+                                              QCA::SecureArray(passphrase.toAscii()),
+                                              &res));
+    if (!QCA::ConvertGood == res || !key.canDecrypt())
         return "";
 
     QCA::SecureArray dataToDecrypt = QCA::hexToArray(data);
