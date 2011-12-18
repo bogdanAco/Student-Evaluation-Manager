@@ -30,7 +30,16 @@ bool Security::setAESkey(const QString &key)
     AEScipher = new QCA::Cipher(QString("aes256"), QCA::Cipher::CBC,
                                 QCA::Cipher::DefaultPadding, QCA::Encode,
                                 *AESkey, *AESiv);
+    
     return true;
+}
+
+QString Security::getAESkey()
+{
+    if (AESkey == 0)
+        return "";
+    
+    return QString(qPrintable(QCA::arrayToHex(AESkey->toByteArray())));
 }
 
 QString Security::AESEncrypt(const QString &data) const
@@ -46,7 +55,7 @@ QString Security::AESEncrypt(const QString &data) const
     QCA::SecureArray result = AEScipher->process(dataToEncrypt);
     if (!AEScipher->ok())
         return "";
-
+    
     return QString(qPrintable(QCA::arrayToHex(result.toByteArray())));
 }
 
@@ -63,11 +72,12 @@ QString Security::AESDecrypt(const QString &data) const
     QCA::SecureArray result = AEScipher->process(dataToDecrypt);
     if (!AEScipher->ok())
         return "";
-
+    
     return QString(result.data());
 }
 
-bool Security::setRSAkeys(const QString &pubkey, const QString &prvkey,
+bool Security::setRSAkeys(const QString &pubKeyData, 
+                          const QString &prvKeyData, 
                           const QString &passphrase)
 {
     if (passphrase.length() != 64 || !QCA::isSupported("pkey"))
@@ -75,17 +85,20 @@ bool Security::setRSAkeys(const QString &pubkey, const QString &prvkey,
 
     delete this->RSApublic;
     delete this->RSAprivate;
-    QCA::ConvertResult res;
-    RSApublic = new QCA::PublicKey(QCA::PublicKey::fromDER(pubkey.toAscii(), &res));
-    if (!QCA::ConvertGood == res)
+    
+    QStringList pubKeyParam = pubKeyData.split('|');
+    QStringList prvKeyParam = AESDecrypt(prvKeyData, passphrase).split('|');
+    
+    if (pubKeyParam.length() != 2 || prvKeyParam.length() != 5)
         return false;
-    RSAprivate = new QCA::PrivateKey(
-                QCA::PrivateKey::fromDER(QCA::SecureArray(prvkey.toAscii()),
-                                         QCA::SecureArray(passphrase.toAscii()),
-                                         &res));
-    if (!QCA::ConvertGood == res)
-        return false;
-
+    
+    RSApublic = new QCA::RSAPublicKey(pubKeyParam.at(0), 
+                                      pubKeyParam.at(1));
+    RSAprivate = new QCA::RSAPrivateKey(prvKeyParam.at(0), 
+                                        prvKeyParam.at(1),
+                                        prvKeyParam.at(2),
+                                        prvKeyParam.at(3),
+                                        prvKeyParam.at(4));
     return true;
 }
 
@@ -93,9 +106,11 @@ QString Security::RSAEncrypt(const QString &data) const
 {
     if (!QCA::isSupported("pkey"))
         return "";
-    if (RSApublic == 0 || !RSApublic->canEncrypt())
+    if (RSApublic == 0)
         return "";
-
+    if (!RSApublic->canEncrypt())
+        return "";
+    
     QCA::SecureArray dataToEncrypt = data.toAscii();
     QCA::SecureArray result = RSApublic->encrypt(dataToEncrypt, QCA::EME_PKCS1_OAEP);
 
@@ -106,7 +121,9 @@ QString Security::RSADecrypt(const QString &data) const
 {
     if (!QCA::isSupported("pkey"))
         return "";
-    if (RSAprivate == 0 || !RSAprivate->canDecrypt())
+    if (RSAprivate == 0)
+        return "";
+    if (!RSAprivate->canDecrypt())
         return "";
 
     QCA::SecureArray dataToDecrypt = QCA::hexToArray(data);
@@ -115,6 +132,20 @@ QString Security::RSADecrypt(const QString &data) const
         return QString(result.data());
     else
         return "";
+}
+
+QString Security::RSASign(const QString &data) const
+{
+    if (!QCA::isSupported("pkey"))
+        return "";
+    if (RSAprivate == 0)
+        return "";
+    if (!RSAprivate->canSign())
+        return "";
+    
+    RSAprivate->startSign(QCA::EMSA3_SHA1);
+    RSAprivate->update(QCA::SecureArray(QCA::hexToArray(data)));
+    return QString(qPrintable(QCA::arrayToHex(RSAprivate->signature())));
 }
 
 QString Security::AESEncrypt(const QString &data, const QString &key)
@@ -161,9 +192,13 @@ QString Security::RSAEncrypt(const QString &data, const QString &pubkey)
     if (!QCA::isSupported("pkey"))
         return "";
 
-    QCA::ConvertResult res;
-    QCA::PublicKey key = QCA::PublicKey(QCA::PublicKey::fromDER(pubkey.toAscii(), &res));
-    if (!QCA::ConvertGood == res || !key.canEncrypt())
+    QStringList pubKeyParam = pubkey.split('|');
+    if (pubKeyParam.length() != 2)
+        return "";
+    
+    QCA::RSAPublicKey key = QCA::RSAPublicKey(pubKeyParam.at(0), 
+                                              pubKeyParam.at(1));
+    if (!key.canEncrypt())
         return "";
 
     QCA::SecureArray dataToEncrypt = data.toAscii();
@@ -178,12 +213,16 @@ QString Security::RSADecrypt(const QString &data, const QString &prvkey, const Q
     if (passphrase.length() != 64 || !QCA::isSupported("pkey"))
         return "";
 
-    QCA::ConvertResult res;
-    QCA::PrivateKey key = QCA::PrivateKey(QCA::PrivateKey::fromDER(
-                                              QCA::SecureArray(prvkey.toAscii()),
-                                              QCA::SecureArray(passphrase.toAscii()),
-                                              &res));
-    if (!QCA::ConvertGood == res || !key.canDecrypt())
+    QStringList prvKeyParam = AESDecrypt(prvkey, passphrase).split('|');
+    if (prvKeyParam.length() != 5)
+        return "";
+
+    QCA::RSAPrivateKey key = QCA::RSAPrivateKey(prvKeyParam.at(0), 
+                                                prvKeyParam.at(1),
+                                                prvKeyParam.at(2),
+                                                prvKeyParam.at(3),
+                                                prvKeyParam.at(4));
+    if (!key.canDecrypt())
         return "";
 
     QCA::SecureArray dataToDecrypt = QCA::hexToArray(data);
@@ -192,6 +231,28 @@ QString Security::RSADecrypt(const QString &data, const QString &prvkey, const Q
         return QString(result.data());
     else
         return "";
+}
+
+bool Security::RSAVerifySignature(const QString &data, 
+                                  const QString &signedData, 
+                                  const QString &pubKeyData)
+{
+    QCA::Initializer init;
+    if (!QCA::isSupported("pkey"))
+        return "";
+    
+    QStringList pubKeyParam = pubKeyData.split('|');
+    if (pubKeyParam.length() != 2)
+        return "";
+    
+    QCA::RSAPublicKey key = QCA::RSAPublicKey(pubKeyParam.at(0), 
+                                              pubKeyParam.at(1));
+    if (!key.canEncrypt())
+        return "";
+    
+    key.startVerify(QCA::EMSA3_SHA1);
+    key.update(QCA::SecureArray(QCA::hexToArray(data)));
+    return key.validSignature(QCA::hexToArray(signedData));
 }
 
 QString Security::getHash(const QString &text)
@@ -222,12 +283,17 @@ QPair<QString,QString> Security::generateKeyPair(const QString &passphrase)
            !QCA::PKey::supportedIOTypes().contains(QCA::PKey::RSA))
         return QPair<QString,QString>();
 
-    QCA::PrivateKey prvkey = QCA::KeyGenerator().createRSA(1024);
-    QCA::PublicKey pubkey = prvkey.toPublicKey();
-    QCA::SecureArray passphr = QCA::SecureArray(passphrase.toAscii());
-    QCA::SecureArray prv = QCA::SecureArray(prvkey.toDER(passphr));
-
-    return QPair<QString, QString>(
-                QString(qPrintable(QCA::arrayToHex(pubkey.toDER()))),
-                QString(qPrintable(QCA::arrayToHex(prv.toByteArray()))));
+    QCA::RSAPrivateKey prvkey = QCA::KeyGenerator().createRSA(1024).toRSA();
+    QCA::RSAPublicKey pubkey = prvkey.toPublicKey().toRSA();
+    QString pubkeyData = QString("%1|%2").
+            arg(pubkey.n().toString()).
+            arg(pubkey.e().toString());
+    QString prvkeyData = QString("%1|%2|%3|%4|%5").
+            arg(pubkey.n().toString()).
+            arg(pubkey.e().toString()).
+            arg(prvkey.p().toString()).
+            arg(prvkey.q().toString()).
+            arg(prvkey.d().toString());
+    
+    return QPair<QString, QString>(pubkeyData, AESEncrypt(prvkeyData, passphrase));
 }

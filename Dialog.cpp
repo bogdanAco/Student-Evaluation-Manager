@@ -188,9 +188,15 @@ UserSignInDialog::UserSignInDialog(QWidget *parent) :
     setWindowTitle("User sign in");
     setFixedWidth(250);
     usrnm->setText("");
+    text->setText("New user name:");
     passwd->setText("");
-    mainLayout->addWidget(new QLabel("Create new user\n",
-                                     this), 1, 0, 2, 4);
+    connect(passwd, SIGNAL(textChanged(QString)),
+            this, SLOT(strongPassword(QString)));
+    passwdVerifyLabel = new QLabel("Retype password:");
+    mainLayout->addWidget(passwdVerifyLabel, 7, 0, 1, 4);
+    passwdVerify = new QLineEdit();
+    passwdVerify->setEchoMode(QLineEdit::Password);
+    mainLayout->addWidget(passwdVerify, 8, 0, 1, 4);
 }
 
 void UserSignInDialog::checkData()
@@ -208,11 +214,49 @@ void UserSignInDialog::checkData()
         result->setText("No password entered");
         return;
     }
-
+    else if (!strongPassword(passwd->text()))
+    {
+        return;
+    }
+    else if (passwd->text() != passwdVerify->text())
+    {
+        result->setText("Please retype the password");
+        return;
+    }
+    
     emit dataChecked(usrnm->text(), passwd->text());
 }
 
-UserSignInDialog::~UserSignInDialog() { }
+bool UserSignInDialog::strongPassword(const QString &pass)
+{
+    result->setText("");
+    if (pass.length() >= 10)
+        if (pass.contains(QRegExp("[a-z]")))
+            if (pass.contains(QRegExp("[A-Z]")))
+                if (pass.contains(QRegExp("[0-9]")))
+                    if (pass.contains(QRegExp("\\W")))
+                    {
+                        result->setText("");
+                        return true;
+                    }
+                    else
+                        result->setText("No special character");
+                else
+                    result->setText("No digits");
+            else
+                result->setText("No upper case letters");
+        else
+            result->setText("No lower case letters");
+    else
+        result->setText("Password too short");
+    return false;
+}
+
+UserSignInDialog::~UserSignInDialog() 
+{ 
+    delete passwdVerify;
+    delete passwdVerifyLabel;
+}
 
 ErrorDialog::ErrorDialog(const QString& text, QWidget* parent) :
         Dialog("Error", text, parent)

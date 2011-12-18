@@ -112,9 +112,14 @@ class UserSignInDialog : public UserLoginDialog
 public:
     UserSignInDialog(QWidget *parent = 0);
     ~UserSignInDialog();
+    
+private:
+    QLabel *passwdVerifyLabel;
+    QLineEdit *passwdVerify;
 
 private slots:
     void checkData();
+    bool strongPassword(const QString &pass);
 
 signals:
     void dataChecked(const QString &name,

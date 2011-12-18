@@ -212,7 +212,7 @@ void ConfigurationDialog::createSecurityTab()
     generateKeysButton->setFixedWidth(150);
     securityLayout->addWidget(generateKeysButton);
     connect(generateKeysButton, SIGNAL(pressed()),
-            this, SLOT(generateKeys()));
+            this, SLOT(prepareKeysGeneration()));
 
     securityTab->setLayout(securityLayout);
 }
@@ -220,6 +220,8 @@ void ConfigurationDialog::createSecurityTab()
 void ConfigurationDialog::prepareKeysGeneration()
 {
     UserLoginDialog *d = new UserLoginDialog(this);
+    d->show();
+    d->setWindowTitle("Passphrase generation");
     connect(d, SIGNAL(saveLoginDataSignal(QString,QString)),
             this, SLOT(generateKeys(QString,QString)));
     connect(d, SIGNAL(saveLoginDataSignal(QString,QString)),

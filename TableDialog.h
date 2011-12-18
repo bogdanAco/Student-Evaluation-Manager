@@ -26,8 +26,8 @@ public:
     ~TableDialog();
 
 public slots:
-    void loadTreeData(const QList<QPair<QString, QString> > &tables,
-                     const QList<QPair<QString, QString> > &folders);
+    void loadTreeData(const QHash<QString, QString> &tables,
+                      const QHash<QString, QString> &folders);
     virtual void checkValidity() = 0;
     void showSelectedItem();
 

@@ -41,7 +41,7 @@ private:
     QMenu *application;
     //Toolbars
     QToolBar *tableToolBar;
-    QToolBar *editToolBar;
+    QToolBar *editToolBar;   
     QToolBar *appToolBar;
     QToolBar *formulaToolBar;
     QLineEdit *cellFormula;
@@ -61,9 +61,15 @@ private:
     QAction *addColumnAction;
     QAction *removeColumnAction;
     QAction *addRowAction;
-    QAction *grantRightsAction;
+    QAction *grantReadAccessAction;
+    QAction *grantWriteAccessAction;
     QAction *setHeaderTextAction;
     QAction *resetHeaderTextAction;
+    
+    QPushButton *fontColorButton,
+                *backgroundColorButton,
+                *fontButton;
+    QPixmap *colorPixmap;
     //Formula action
     QAction *formulaAction;
     //Application actions
@@ -72,6 +78,7 @@ private:
     QAction *loginAction;
     QAction *logoutAction;
     QAction *signinAction;
+    
 private slots:
     void CreateErrorDialog(const QString& message);
     void newTable();
@@ -97,8 +104,13 @@ private slots:
     void createAddRowsDialog();
     void createSetColumnHeaderDialog();
     void createResetColumnHeaderDialog();
-    void createGrantRightsDialog();
-    void grantRights(const QString &username);
+    void createSetFontDialog();
+    void createSetFontColorDialog();
+    void createSetBackgroundColorDialog();
+    void setCurrentCellsFont(const QFont &font);
+    void createGrantReadAccessDialog();
+    void createGrantWriteAccessDialog();
+    void grantWriteAccess(const QString &username);
     void createConfigureAppDialog();
     void createImportDataDialog();
     void createFormulaDialog();
@@ -108,6 +120,9 @@ private slots:
     void initializeDatabase();
     void displayError(const QString &message);
     void clearErrorMessage();
+    void displayCurrentCellSettings(const QFont &font, 
+                                    const QBrush &background,
+                                    const QBrush &foreground);
 };
 
 #endif // MAINWINDOW_H

@@ -2,6 +2,7 @@
 #define SPREADSHEET_H
 
 #include "Cell.h"
+#include <QtCrypto>
 
 class SpreadSheet : public QTableWidget
 {
@@ -26,6 +27,9 @@ public:
     void setCellsSize(const QSize &size);
     void setFormula(const QString &formula);
     QList<int> selectedColumns();
+    QString headerText(int column);
+    void setHeaderText(int column, const QString &text);
+    QFont currentFont() const;
 
 private:
     QTimer *refresh_timer;
@@ -43,6 +47,10 @@ signals:
     void invalidFormula(const QString &message) const;
     void columnResize(int logicalIndex, int oldSize, int newSize);
     void rowResize(int logicalIndex, int oldSize, int newSize);
+    void columnHeaderTextChanged(int column, const QString &text);
+    void currentSelectionChanged(const QFont &font, 
+                                 const QBrush &background,
+                                 const QBrush &foreground);
 
 public slots:
     void setFormula(int row, int column, const QString &formula);
@@ -51,8 +59,12 @@ public slots:
     void paste();
     void del();
     void setCurrentColumnHeaderText(const QString &text);
+    void setCurrentCellsFont(const QFont &f);
+    void setFontColor(const QColor &c);
+    void setBackgroundColor(const QColor &c);
     void setRowsSize(const QMap<int,int> size);
     void setColumnsSize(const QMap<int,int> size);
+    void setColumnsHeaderText(const QMap<int, QString> data);
     void selectCurrentRow();
     void selectCurrentColumn();
     void findNext(const QString &str, Qt::CaseSensitivity cs);
@@ -64,9 +76,10 @@ public slots:
 
 private slots:
     void somethingChanged(QTableWidgetItem *cell);
-    void loadData(const QStringList &data);
+    void loadData(const QMap<int, QString> &data);
     void emitGetLink(const QString &table, int r,
                      int c, const QTableWidgetItem* cell);
+    void currentSelectionChanged();
 };
 
 #endif // SPREADSHEET_H

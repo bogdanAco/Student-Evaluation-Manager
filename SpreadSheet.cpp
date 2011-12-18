@@ -21,6 +21,8 @@ SpreadSheet::SpreadSheet(int rows, int columns, QWidget *parent) : QTableWidget(
             this, SIGNAL(columnResize(int,int,int)));
     connect(this->verticalHeader(), SIGNAL(sectionResized(int,int,int)),
             this, SIGNAL(rowResize(int,int,int)));
+    connect(this, SIGNAL(itemSelectionChanged()),
+            this, SLOT(currentSelectionChanged()));
 
     clear();
 }
@@ -259,8 +261,48 @@ QList<int> SpreadSheet::selectedColumns()
         if (!aux.contains(current_col))
             aux.append(current_col);
     }
+    qSort(aux);
 
     return aux;
+}
+
+QString SpreadSheet::headerText(int column)
+{
+    if (column >= 0 && column < columnCount())
+    {
+        QTableWidgetItem *item = horizontalHeaderItem(column);
+        if (item)
+            return item->text();
+        else
+            return QString(QChar('A' + column));
+    }
+    return "";
+}
+
+void SpreadSheet::setHeaderText(int column, const QString &text)
+{
+    if (column >= 0 && column < columnCount())
+    {
+        QTableWidgetItem *item = horizontalHeaderItem(column);
+        if (!item)
+        {
+            item = new QTableWidgetItem();
+            setHorizontalHeaderItem(column, item);
+        }
+        QString headerText = QString("%1").arg(QChar('A' + column));
+        if (text != "")
+            headerText.append(QString("\n%1").arg(text));
+        item->setText(headerText);
+    }
+}
+
+QFont SpreadSheet::currentFont() const
+{
+    QTableWidgetItem *item = currentItem();
+    if (!item)
+        return QApplication::font();
+    
+    return item->font();
 }
 
 int SpreadSheet::getNonzeroRowCount(int column) const
@@ -309,11 +351,10 @@ void SpreadSheet::clear()
     for (int i = 0; i < columnCount(); ++i)
     {
         QTableWidgetItem *item = horizontalHeaderItem(i);
-        if (item)
-            continue;
-        item = new QTableWidgetItem;
-        this->setHorizontalHeaderItem(i, item);
+        if (!item)
+            item = new QTableWidgetItem();
         item->setText(QString(QChar('A' + i)));
+        this->setHorizontalHeaderItem(i, item);
     }
 
     setCurrentCell(0, 0);
@@ -439,16 +480,33 @@ void SpreadSheet::del()
 void SpreadSheet::setCurrentColumnHeaderText(const QString &text)
 {
     int column = currentColumn();
-    QTableWidgetItem *item = horizontalHeaderItem(column);
-    if (!item)
-    {
-        item = new QTableWidgetItem;
-        setHorizontalHeaderItem(column, item);
-    }
-    QString headerText = QString("%1").arg(QChar('A' + column));
-    if (text != "")
-        headerText.append(QString("\n%1").arg(text));
-    item->setText(headerText);
+    setHeaderText(column, text);
+    
+    emit columnHeaderTextChanged(column, text);
+}
+
+void SpreadSheet::setCurrentCellsFont(const QFont &f)
+{
+    QList<QTableWidgetItem*> items = selectedItems();
+    for (int i=0; i<items.length(); i++)
+        if (items[i])
+            items[i]->setFont(f);
+}
+
+void SpreadSheet::setFontColor(const QColor &c)
+{
+    QList<QTableWidgetItem*> items = selectedItems();
+    for (int i=0; i<items.length(); i++)
+        if (items[i])
+            items[i]->setForeground(QBrush(c));
+}
+
+void SpreadSheet::setBackgroundColor(const QColor &c)
+{
+    QList<QTableWidgetItem*> items = selectedItems();
+    for (int i=0; i<items.length(); i++)
+        if (items[i])
+            items[i]->setBackgroundColor(c);
 }
 
 void SpreadSheet::setRowsSize(const QMap<int, int> size)
@@ -468,6 +526,27 @@ void SpreadSheet::setColumnsSize(const QMap<int, int> size)
     {
         i.next();
         setColumnWidth(i.key(), i.value());
+    }
+}
+
+void SpreadSheet::setColumnsHeaderText(const QMap<int, QString> data)
+{
+    QMapIterator<int, QString> it(data);
+    while (it.hasNext())
+    {
+        it.next();
+        int column = it.key();
+        QString text = it.value();
+        QTableWidgetItem *item = horizontalHeaderItem(column);
+        if (!item)
+        {
+            item = new QTableWidgetItem();
+            setHorizontalHeaderItem(column, item);
+        }
+        QString headerText = QString("%1").arg(QChar('A' + column));
+        if (text != "")
+            headerText.append(QString("\n%1").arg(text));
+        item->setText(headerText);
     }
 }
 
@@ -545,9 +624,16 @@ void SpreadSheet::addRows(int rows)
 
 void SpreadSheet::removeColumns(const QList <int> column_ids)
 {
-    for (int i=0; i<column_ids.length(); i++)
+    for (int i=column_ids.length()-1; i>=0; i--)
+    {
         removeColumn(column_ids.at(i));
-    clear();
+        QStringList headerTxt = headerText(column_ids.at(i)).split('\n');
+        if (headerTxt.length() > 0)
+        {
+            headerTxt.removeAt(0);
+            setHeaderText(column_ids.at(i), headerTxt.join("\n"));
+        }
+    }
 }
 
 void SpreadSheet::setRights(const QList<int> columns)
@@ -583,23 +669,43 @@ void SpreadSheet::somethingChanged(QTableWidgetItem *cell)
 {
     if (cell == 0)
         return;
+    
+    QByteArray cellData;
+    QDataStream out(&cellData, QIODevice::WriteOnly);
+    out << cell->font() << cell->foreground() << cell->background() << 
+           cell->data(Qt::EditRole).toString();
+    
     QString aux = QString("%1\n%2\n%3").
                     arg(cell->row()).
                     arg(cell->column()).
-                    arg(cell->data(Qt::EditRole).toString());
+                    arg(QCA::arrayToHex(cellData));
     emit modified(aux);
 }
 
-void SpreadSheet::loadData(const QStringList &data)
+void SpreadSheet::loadData(const QMap<int, QString> &data)
 {
-    if (data.length() == 0)
-        return;
     QStringList aux;
-    for (int i=0; i<data.length(); i++)
+    QMapIterator<int, QString> it(data);
+    while (it.hasNext())
     {
-        aux = ((QString)data.at(i)).split('\n');
-        for (int j=0; j<aux.length(); j++)
-            this->setFormula(i, j, aux[j]);
+        it.next();
+        aux = ((QString)it.value()).split('\n');
+        for (int c=0; c<aux.length(); c++)
+        {
+            QFont font;
+            QBrush foreground, background;
+            QString formula;
+            
+            QByteArray cellData = QCA::hexToArray(aux.at(c));
+            QDataStream in(&cellData, QIODevice::ReadOnly);
+            in >> font >> foreground >> background >> formula;
+                    
+            setFormula(it.key(), c, formula);
+            QTableWidgetItem *item = this->item(it.key(), c);
+            item->setFont(font);
+            item->setForeground(foreground);
+            item->setBackground(background);
+        }
     }
 }
 
@@ -607,4 +713,14 @@ void SpreadSheet::emitGetLink(const QString &table, int r,
                  int c, const QTableWidgetItem* cell)
 {
     emit getLink(table, r, c, column(cell), row(cell));
+}
+
+void SpreadSheet::currentSelectionChanged()
+{
+    QTableWidgetItem *item = currentItem();
+    if (!item)
+        return;
+    
+    emit currentSelectionChanged(item->font(), item->background(),
+                                 item->foreground());
 }

@@ -23,12 +23,12 @@ DBManager::DBManager(const CFGManager *cfg)
     security = new Security();
 }
 
-void DBManager::setCurrentSpreadSheet(const SpreadSheet *spreadsheet)
+void DBManager::setCurrentSpreadSheet(SpreadSheet *spreadsheet)
 {
     this->spreadsheet = spreadsheet;
 
-    connect(this, SIGNAL(dataLoaded(QStringList)),
-            this->spreadsheet, SLOT(loadData(QStringList)));
+    connect(this, SIGNAL(dataLoaded(QMap<int,QString>)),
+            this->spreadsheet, SLOT(loadData(QMap<int,QString>)));
     connect(this->spreadsheet, SIGNAL(getLink(QString,int,int,int,int)),
             this, SLOT(getData(QString,int,int,int,int)));
     connect(this, SIGNAL(dataLoaded(int,int,QString)),
@@ -39,6 +39,8 @@ void DBManager::setCurrentSpreadSheet(const SpreadSheet *spreadsheet)
             this->spreadsheet, SLOT(setRowsSize(QMap<int,int>)));
     connect(this, SIGNAL(columnsWidthLoaded(QMap<int,int>)),
             this->spreadsheet, SLOT(setColumnsSize(QMap<int,int>)));
+    connect(this, SIGNAL(columnsHeaderTextLoaded(QMap<int,QString>)),
+            spreadsheet, SLOT(setColumnsHeaderText(QMap<int,QString>)));
     getData();
 
     connect(this->spreadsheet->getTimer(), SIGNAL(timeout()),
@@ -61,6 +63,7 @@ void DBManager::removeCurrentData()
     current_table_id = -1;
 }
 
+//OK, TESTED, WORKING
 void DBManager::initializeDatabase()
 {
     db.setDatabaseName("");
@@ -145,6 +148,7 @@ bool DBManager::connectDB(const QString &uname, const QString &pass)
     }
 }
 
+//OK, TESTED, WORKING
 void DBManager::login(const QString& uname, const QString& pass)
 {
     if (!db.isOpen())
@@ -154,13 +158,11 @@ void DBManager::login(const QString& uname, const QString& pass)
         return;
     }
 
-    QString username = Security::getHash(uname);
-    QString password = Security::getHash(pass);
     query->prepare("SELECT user_id, user_name, passwd, public_key "
                    "FROM users "
                    "WHERE user_name=:usr AND passwd=:pass");
-    query->bindValue(":usr",username);
-    query->bindValue(":pass",password);
+    query->bindValue(":usr", uname);
+    query->bindValue(":pass", Security::getHash(pass));
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
@@ -172,6 +174,7 @@ void DBManager::login(const QString& uname, const QString& pass)
         return;
     }
 
+    cfg->setCurrentUser(uname);
     QString passphrase = Security::getHash(uname+pass);
     while (query->next())
     {
@@ -207,18 +210,17 @@ void DBManager::login(const QString& uname, const QString& pass)
         query->bindValue(":table", backup_tables.at(i));
         query->exec();
     }
-
+    
     emit loggedIn(current_user_id);
 }
 
+//OK, TESTED, WORKING
 void DBManager::createUser(const QString &uname, const QString &pass)
 {
-    QString username = Security::getHash(uname);
-    QString password = Security::getHash(pass);
     query->prepare("SELECT user_id "
                    "FROM users "
                    "WHERE user_name=:usr");
-    query->bindValue(":usr",username);
+    query->bindValue(":usr", uname);
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
@@ -241,16 +243,16 @@ void DBManager::createUser(const QString &uname, const QString &pass)
     while (query->next())
         uid = query->value(0).toInt();
 
-    QString passphr = Security::getHash(username+password);
+    QString passphr = Security::getHash(uname+pass);
     QPair<QString, QString> keys = Security::generateKeyPair(passphr);
-    cfg->setCurrentUser(username);
+    cfg->setCurrentUser(uname);
     cfg->setKey(keys.second);
 
     query->prepare("INSERT INTO users "
                    "VALUES (:uid, :usr, :pass, :pubkey)");
-    query->bindValue(":uid", uid+1);
-    query->bindValue(":usr", username);
-    query->bindValue(":pass", password);
+    query->bindValue(":uid", uid);
+    query->bindValue(":usr", uname);
+    query->bindValue(":pass", Security::getHash(pass));
     query->bindValue(":pubkey", keys.first);
     if (!query->exec())
     {
@@ -270,12 +272,52 @@ void DBManager::createUser(const QString &uname, const QString &pass)
     emit userCreated();
 }
 
-void DBManager::grantRights(const QList<int> columns, const QString &username)
+//OK TESTED WORKING
+void DBManager::grantReadAccess(const QString &username)
 {
-    QString encUsername = Security::getHash(username);
+    query->prepare("SELECT user_id, public_key "
+                   "FROM users "
+                   "WHERE user_name=:name");
+    query->bindValue(":name", username);
+    if (!query->exec())
+    {
+        emit queryError("Please check your database connection");
+        return;
+    }
+    if (query->size() == 0)
+    {
+        emit queryError("User does not exist");
+        return;
+    }
+
+    int uid = -1;
+    QString pubkey = "";
+    while (query->next())
+    {
+        uid = query->value(0).toInt();
+        pubkey = query->value(1).toString();
+    }
+    
+    query->prepare("INSERT INTO access_keys "
+                   "VALUES (:tid, :uid, :key, :signedkey)");
+    query->bindValue(":tid", current_table_id);
+    query->bindValue(":uid", uid);
+    query->bindValue(":key", Security::RSAEncrypt(security->getAESkey(), 
+                                                  pubkey));
+    query->bindValue(":signedkey", security->RSASign(security->getAESkey()));
+    if (!query->exec())
+    {
+        emit queryError("Please check your database connection");
+        return;
+    }
+}
+
+//OK TESTED WORKING
+void DBManager::grantWriteAccess(const QString &username, const QList<int> columns)
+{
     query->prepare("SELECT user_id FROM users "
                    "WHERE user_name=:name");
-    query->bindValue(":name", encUsername);
+    query->bindValue(":name", username);
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
@@ -310,27 +352,38 @@ void DBManager::grantRights(const QList<int> columns, const QString &username)
 
     for (int i=0; i<columns.length(); i++)
     {
-        query->exec(QString("SELECT * FROM rights "
-                            "WHERE table_id='%1'"
-                            "AND user_id=%2 "
-                            "AND column_id=%3").
-                    arg(current_table_id).arg(uid).arg(columns.at(i)));
+        query->prepare("SELECT user_id "
+                       "FROM rights "
+                       "WHERE table_id=:tid "
+                       "AND user_id=:uid "
+                       "AND column_id=:cid");
+        query->bindValue(":tid", current_table_id);
+        query->bindValue(":uid", uid);
+        query->bindValue(":cid", columns.at(i));
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
         if (query->size() > 0)
             continue;
 
-        if (!query->exec(QString("INSERT INTO rights "
-                            "VALUES (%1, %2, %3)").
-                    arg(current_table_id).arg(uid).arg(columns.at(i))))
+        query->prepare("INSERT INTO rights "
+                       "VALUES (:tid, :uid, :cid)");
+        query->bindValue(":tid", current_table_id);
+        query->bindValue(":uid", uid);
+        query->bindValue(":cid", columns.at(i));
+        if (!query->exec())
         {
             emit queryError("Please check your database connection");
             return;
         }
     }
 
-    if (current_user_id == uid)
-        emit rightsLoaded(columns);
+    emit rightsLoaded(columns);
 }
 
+//OK, TESTED, WORKING
 bool DBManager::writeData(int line, int column, const QString& cell_data)
 {
     QString dataToWrite;
@@ -357,10 +410,9 @@ bool DBManager::writeData(int line, int column, const QString& cell_data)
             return false;
 
         query->prepare(QString("INSERT INTO %1 "
-                       "(row_index, row_timestamp, row_height, %2)"
+                       "(row_index, row_timestamp, row_height, field%2)"
                        " VALUES (:rowIndex, :timestamp, :height, :fieldVal)").
-                       arg(*current_table).arg(QString("field%1").
-                       arg(column)));
+                       arg(*current_table).arg(column));
         query->bindValue(":rowIndex", line);
         query->bindValue(":timestamp", timestamp);
         query->bindValue(":height", spreadsheet->rowHeight(line));
@@ -379,18 +431,18 @@ bool DBManager::writeData(int line, int column, const QString& cell_data)
         if (dataToWrite == "")
             query->prepare(QString("UPDATE %1 "
                                    "SET row_timestamp = :timestamp, "
-                                   "%2 = :fieldVal "
+                                   "field%2 = :fieldVal "
                                    "WHERE row_index = :rowIndex "
-                                   "AND %2 <> ''").
+                                   "AND field%2 <> ''").
                                     arg(*current_table).
-                                    arg(QString("field%1").arg(column)));
+                                    arg(column));
         else
             query->prepare(QString("UPDATE %1 "
                                    "SET row_timestamp = :timestamp, "
-                                   "%2 = :fieldVal "
+                                   "field%2 = :fieldVal "
                                    "WHERE row_index = :rowIndex").
                                     arg(*current_table).
-                                    arg(QString("field%1").arg(column)));
+                                    arg(column));
         query->bindValue(":fieldVal", dataToWrite);
         query->bindValue(":timestamp", timestamp);
         query->bindValue(":rowIndex", line);
@@ -407,6 +459,7 @@ bool DBManager::writeData(int line, int column, const QString& cell_data)
     return false;
 }
 
+//OK, TESTED, WORKING
 void DBManager::getData()
 {
     QString aux = QString("SELECT * "
@@ -434,15 +487,16 @@ void DBManager::getData()
         return;
     }
 
-    QSqlRecord record = query->record();
-    int columns = record.count();
+    int columns = query->record().count();
     if (columns == 0)
         return;
 
+    spreadsheet->setColumnCount(columns-3);
+    
     bool add = false;
     if (timestampCount == 0)
         add = true;
-    QStringList current_data = QStringList();
+    QMap<int, QString> current_data = QMap<int, QString>();
     QMap<int,int> rows_height = QMap<int,int>();
     while (query->next())
     {
@@ -456,7 +510,7 @@ void DBManager::getData()
             aux.append(decryptedData+"\n");
         }
         aux.remove(aux.length()-1, 1);
-        current_data.append(aux);
+        current_data.insert(query->value(0).toInt(), aux);
         rows_height.insert(query->value(0).toInt(),
                            query->value(2).toInt());
         if (add)
@@ -479,8 +533,9 @@ void DBManager::getData()
         writable_columns.append(query->value(0).toInt());
 
     QMap<int,int> columns_width = QMap<int,int>();
-    query->prepare("SELECT column_id, width "
-                   "FROM tables_size "
+    QMap<int,QString> headers_text = QMap<int,QString>();
+    query->prepare("SELECT column_id, width, header_text "
+                   "FROM tables_settings "
                    "WHERE table_id=:tid");
     query->bindValue(":tid", current_table_id);
     if (!query->exec())
@@ -489,15 +544,22 @@ void DBManager::getData()
         return;
     }
     while (query->next())
+    {
         columns_width.insert(query->value(0).toInt(),
                              query->value(1).toInt());
+        headers_text.insert(query->value(0).toInt(),
+                            query->value(2).toString());
+    }
 
     emit columnsWidthLoaded(columns_width);
     emit rowsHeightLoaded(rows_height);
+    emit columnsHeaderTextLoaded(headers_text);
     emit rightsLoaded(writable_columns);
     emit dataLoaded(current_data);
 }
 
+//TO BE TESTED
+//CORECTARE: NUMAI PENTRU UTILIZATORI CU ACCESS LA TABELA SI LA (linie, coloana)
 void DBManager::getData(const QString &table, int row, int column,
                         int destRow, int destCol)
 {
@@ -531,7 +593,8 @@ void DBManager::getData(const QString &table, int row, int column,
     emit dataLoaded(destRow, destCol, data);
 }
 
-//CORECTARE: NUMAI PENTRU UTILIZATORI CU ACCESS LA TABELA
+//TO BE TESTED
+//CORECTARE: NUMAI PENTRU UTILIZATORI CU ACCESS LA TABELA SI LA (linie, coloana)
 void DBManager::getGivenData(int field, const QString &fieldVal,
                              const QString &table)
 {
@@ -584,29 +647,30 @@ void DBManager::getGivenData(int field, const QString &fieldVal,
     emit givenDataLoaded(current_data);
 }
 
+//OK, TESTED, WORKING
 void DBManager::createTable(const QString &name, int columns,
                            int rows, const QString &folder)
 {
-    QSqlRecord record;
-    if (!query->exec("SELECT * "
+    if (!query->exec("SELECT val "
                     "FROM current_ids "
                     "WHERE type='file'"))
     {
         emit queryError("Please check your database connection");
         return;
     }
-    record = query->record();
-    int colIndex = record.indexOf("val");
     int current_index = 0;
     while (query->next())
-        current_index = query->value(colIndex).toInt();
+        current_index = query->value(0).toInt();
 
     QString tableName = QString("table%1").arg(current_index);
+    current_table = new QString(tableName);
+    current_table_id = current_index;
+    
     QString aux = QString("CREATE TABLE %1 (row_index INT NOT NULL, "
                           "row_timestamp VARCHAR(25) NOT NULL, "
                           "row_height INT NOT NULL, ").arg(tableName);
     for (int i=0; i<columns; i++)
-        aux.append(QString("field%1 VARCHAR(512), ").arg(i));
+        aux.append(QString("field%1 VARCHAR(2048), ").arg(i));
     aux.append("CONSTRAINT row_index_pk "
                "PRIMARY KEY (row_index) )");
     if (!query->exec(aux))
@@ -614,7 +678,7 @@ void DBManager::createTable(const QString &name, int columns,
         emit queryError("Please check your database connection");
         return;
     }
-
+    
     query->prepare("INSERT INTO files "
                    "VALUES (:id, :tableName, :fileName, :owner, :rows, "
                    "(SELECT folder_id FROM folders WHERE folder_name = :folder) )");
@@ -629,30 +693,37 @@ void DBManager::createTable(const QString &name, int columns,
         query->exec(QString("DROP TABLE %1").arg(tableName));
         emit queryError("Please check your database connection");
         return;
-    }
-
-    query->prepare("UPDATE current_ids "
-                   "SET val=:value "
-                   "WHERE type='file'");
-    query->bindValue(":value", current_index+1);
-    if (!query->exec())
-    {
-        query->exec(QString("DROP TABLE %1").arg(tableName));
-        query->prepare("DELETE FROM files WHERE file_id=:fileID");
-        query->bindValue(":fileID", current_index);
-        emit queryError("Please check your database connection");
-        return;
-    }
-    current_table = new QString(tableName);
-    current_table_id = current_index;
+    }    
 
     query->prepare("INSERT INTO access_keys "
-                   "VALUES (:tid, :uid, :key)");
+                   "VALUES (:tid, :uid, :key, :signature)");
     query->bindValue(":tid", current_table_id);
     query->bindValue(":uid", current_user_id);
     QString aesKey = Security::generateAESKey();
-    query->bindValue(":key", security->RSAEncrypt(aesKey));
+    if (aesKey == "")
+    {
+        deleteTable(current_table_id);
+        emit queryError("Unable to generate private encryption key");
+        return;
+    }
+    QString encrAccKey = security->RSAEncrypt(aesKey);
+    if (encrAccKey == "")
+    {
+        deleteTable(current_table_id);
+        emit queryError("Unable to encrypt the access key");
+        return;
+    }
+    query->bindValue(":key", encrAccKey);
+    QString accKeySigned = security->RSASign(aesKey);
+    if (accKeySigned == "")
+    {
+        deleteTable(current_table_id);
+        emit queryError("Unable to sign the access key");
+        return;
+    }
+    query->bindValue(":signature", accKeySigned);
     security->setAESkey(aesKey);
+    
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
@@ -661,20 +732,35 @@ void DBManager::createTable(const QString &name, int columns,
 
     for (int i=0; i<columns; i++)
         if (!query->exec(QString("INSERT INTO rights "
-                                 "VALUES ('%1', %2, %3)").arg(tableName).
+                                 "VALUES (%1, %2, %3)").arg(current_index).
                                             arg(current_user_id).arg(i)))
         {
+            deleteTable(current_table_id);
             emit queryError("Please check your database connection");
             return;
         }
+    
+    query->prepare("UPDATE current_ids "
+                   "SET val=val+1 "
+                   "WHERE type='file'");
+    if (!query->exec())
+    {
+        query->exec(QString("DROP TABLE %1").arg(tableName));
+        query->prepare("DELETE FROM files WHERE file_id=:fileID");
+        query->bindValue(":fileID", current_index);
+        emit queryError("Please check your database connection");
+        return;
+    }
 
     emit tableCreated(tableName, columns, rows);
 }
 
+//OK, TESTED, WORKING
 void DBManager::openTable(const QString &name, int columns,
               int rows, const QString &folder)
 {   
-    query->prepare("SELECT table_name, row_count, file_id FROM files "
+    query->prepare("SELECT table_name, row_count, file_id, owner "
+                   "FROM files "
                    "WHERE file_name = :name");
     query->bindValue(":name", name);
     if (!query->exec())
@@ -683,17 +769,32 @@ void DBManager::openTable(const QString &name, int columns,
         return;
     }
     int row_count = 0;
+    int owner = -1;
     while (query->next())
     {
         current_table = new QString(query->value(0).toString());
         current_table_id = query->value(2).toInt();
         row_count = query->value(1).toInt();
+        owner = query->value(3).toInt();
     }
 
-    query->prepare("SELECT access_key "
+    QString ownerPubKey = "";
+    query->prepare("SELECT public_key "
+                   "FROM users "
+                   "WHERE user_id=:uid");
+    query->bindValue(":uid", owner);
+    if (!query->exec())
+    {
+        emit queryError("Please check your database connection");
+        return;
+    }
+    while (query->next())
+        ownerPubKey = query->value(0).toString();
+    
+    query->prepare("SELECT access_key, signed_key "
                    "FROM access_keys "
                    "WHERE table_id=:tid "
-                   "AND user_id=_uid");
+                   "AND user_id=:uid");
     query->bindValue(":tid", current_table_id);
     query->bindValue(":uid", current_user_id);
     if (!query->exec())
@@ -707,7 +808,28 @@ void DBManager::openTable(const QString &name, int columns,
         return;
     }
     while (query->next())
-        security->setAESkey(security->RSADecrypt(query->value(0).toString()));
+    {
+        QString aesKey = security->RSADecrypt(query->value(0).toString());
+        if (aesKey == "")
+        {
+            emit queryError("Unable to extract the file's key");
+            return;
+        }
+        if (Security::RSAVerifySignature(aesKey, query->value(1).toString(),
+                                         ownerPubKey))
+        {
+            if (!security->setAESkey(aesKey))
+            {
+                emit queryError("Unable to load the encryption key");
+                return;
+            }
+        }
+        else
+        {
+            emit queryError("Invalid access key - it's not given by the table's owner");
+            return;
+        }
+    }
 
     if (!query->exec(QString("SELECT * FROM %1").arg(*current_table)))
         return;
@@ -716,6 +838,7 @@ void DBManager::openTable(const QString &name, int columns,
     emit tableOpened(name, colCount, row_count);
 }
 
+//OK, TESTED, WORKING
 int DBManager::columnCount()
 {
     if (!query->exec(QString("SELECT * FROM %1").arg(*current_table)))
@@ -724,30 +847,30 @@ int DBManager::columnCount()
     return record.count()-3;
 }
 
-QList<QPair<QString, QString> > DBManager::getTables()
+//OK, TESTED, WORKING
+QHash<QString, QString> DBManager::getTables()
 {
-    QList<QPair<QString, QString> > tables = QList<QPair<QString, QString> >();
+    QHash<QString, QString> tables = QHash<QString, QString>();
     if (!query->exec("SELECT fi.file_name, fo.folder_name "
                      "FROM files fi, folders fo "
                      "WHERE fi.folder = fo.folder_id"))
         return tables;
     while (query->next())
-        tables.append(QPair<QString,QString>(query->value(0).toString(),
-                                             query->value(1).toString()));
+        tables.insert(query->value(0).toString(), query->value(1).toString());
     return tables;
 }
 
-QList<QPair<QString, QString> > DBManager::getFolders()
+//OK, TESTED, WORKING
+QHash<QString, QString> DBManager::getFolders()
 {
-    QList<QPair<QString, QString> > dirs = QList<QPair<QString, QString> >();
+    QHash<QString, QString> folders = QHash<QString, QString>();
     if (!query->exec("SELECT folder_name, folder_parent "
                      "FROM folders WHERE folder_id>0 "
                      "ORDER BY folder_id ASC"))
-        return dirs;
+        return folders;
     while (query->next())
-        dirs.append(QPair<QString,QString>(query->value(0).toString(),
-                                           query->value(1).toString()));
-    return dirs;
+        folders.insert(query->value(0).toString(), query->value(1).toString());
+    return folders;
 }
 
 DBManager::~DBManager()
@@ -760,6 +883,15 @@ DBManager::~DBManager()
     delete current_table;
 }
 
+void DBManager::deleteTable(int id)
+{
+    query->exec(QString("DROP TABLE table%1").arg(id));
+    query->prepare("DELETE FROM files WHERE file_id=:fileID");
+    query->bindValue(":fileID", id);
+    query->exec();
+}
+
+//OK, TESTED, WORKING
 void DBManager::addColumns(int columns)
 {
     int fieldCount = columnCount();
@@ -773,8 +905,8 @@ void DBManager::addColumns(int columns)
             return;
         }
 
-        q = QString("INSERT INTO rights VALUES ('%1', %2, %3)").
-                    arg(*current_table).arg(current_user_id).arg(fieldCount+i);
+        q = QString("INSERT INTO rights VALUES (%1, %2, %3)").
+                    arg(current_table_id).arg(current_user_id).arg(fieldCount+i);
         if (!query->exec(q))
         {
             emit queryError("Please check your database connection");
@@ -784,10 +916,11 @@ void DBManager::addColumns(int columns)
     emit columnsAdded(columns);
 }
 
+//OK, TESTED, WORKING
 void DBManager::removeColumns(const QList <int> column_ids)
 {
     QString q;
-    for (int i=0; i<column_ids.length(); i++)
+    for (int i=column_ids.length()-1; i>=0; i--)
     {
         q = QString("ALTER TABLE %1 DROP COLUMN field%2").
                     arg(*current_table).arg(column_ids.at(i));
@@ -796,13 +929,52 @@ void DBManager::removeColumns(const QList <int> column_ids)
             emit queryError("Please check your database connection1");
             return;
         }
-
-        q = QString("DELETE FROM rights "
-                    "WHERE table_id=%1 "
-                    "AND user_id=%2 "
-                    "AND column_id=%3").
-                    arg(current_table_id).arg(current_user_id).arg(column_ids.at(i));
-        if (!query->exec(q))
+        
+        query->prepare("DELETE FROM rights "
+                       "WHERE table_id=:tid "
+                       "AND user_id=:uid "
+                       "AND column_id=:cid");
+        query->bindValue(":tid", current_table_id);
+        query->bindValue(":uid", current_user_id);
+        query->bindValue(":cid", column_ids.at(i));
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
+        
+        query->prepare("UPDATE rights "
+                       "SET column_id=column_id-1 "
+                       "WHERE table_id=:tid "
+                       "AND user_id=:uid "
+                       "AND column_id>:cid");
+        query->bindValue(":tid", current_table_id);
+        query->bindValue(":uid", current_user_id);
+        query->bindValue(":cid", column_ids.at(i));
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
+        
+        query->prepare("DELETE FROM tables_settings "
+                       "WHERE table_id=:tid "
+                       "AND column_id=:cid");
+        query->bindValue(":tid", current_table_id);
+        query->bindValue(":cid", column_ids.at(i));
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
+        
+        query->prepare("UPDATE tables_settings "
+                       "SET column_id=column_id-1 "
+                       "WHERE table_id=:tid "
+                       "AND column_id>:cid");
+        query->bindValue(":tid", current_table_id);
+        query->bindValue(":cid", column_ids.at(i));
+        if (!query->exec())
         {
             emit queryError("Please check your database connection");
             return;
@@ -821,7 +993,7 @@ void DBManager::removeColumns(const QList <int> column_ids)
                 "row_timestamp VARCHAR(25) NOT NULL, "
                 "row_height INT NOT NULL, ").arg(*current_table);
     for (int i=0; i<newFieldCount; i++)
-        q.append(QString("field%1 VARCHAR(512), ").arg(i));
+        q.append(QString("field%1 VARCHAR(2048), ").arg(i));
     q.append("CONSTRAINT row_index_pk PRIMARY KEY (row_index) )");
     if (!query->exec(q))
     {
@@ -845,10 +1017,14 @@ void DBManager::removeColumns(const QList <int> column_ids)
     emit columnsRemoved(column_ids);
 }
 
+//OK, TESTED, WORKING
 void DBManager::addRows(int rows)
 {
-    query->prepare("UPDATE files SET row_count=row_count+:count");
+    query->prepare("UPDATE files "
+                   "SET row_count=row_count+:count "
+                   "WHERE file_id=:fid");
     query->bindValue(":count", rows);
+    query->bindValue(":fid", current_table_id);
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
@@ -857,24 +1033,99 @@ void DBManager::addRows(int rows)
     emit rowsAdded(rows);
 }
 
+//OK, TESTED, WORKING
 void DBManager::setColumnWidth(int column, int oldSize, int newSize)
 {
-    query->prepare("UPDATE tables_size "
-                   "SET width=:nw "
+    query->prepare("SELECT width "
+                   "FROM tables_settings "
                    "WHERE table_id=:tid "
-                   "AND column_id=:col "
-                   "AND width <> :ow");
-    query->bindValue(":nw", newSize);
+                   "AND column_id=:col");
     query->bindValue(":tid", current_table_id);
     query->bindValue(":col", column);
-    query->bindValue(":ow", oldSize);
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
         return;
     }
+    if (query->size() == 0)
+    {
+        query->prepare("INSERT INTO tables_settings "
+                       "VALUES (:tid, :col, :width, :text)");
+        query->bindValue(":tid", current_table_id);
+        query->bindValue(":col", column);
+        query->bindValue(":width", newSize);
+        query->bindValue(":text", "");
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
+    }
+    else
+    {
+        query->prepare("UPDATE tables_settings "
+                       "SET width=:nw "
+                       "WHERE table_id=:tid "
+                       "AND column_id=:col "
+                       "AND width <> :ow");
+        query->bindValue(":nw", newSize);
+        query->bindValue(":tid", current_table_id);
+        query->bindValue(":col", column);
+        query->bindValue(":ow", oldSize);
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
+    }
 }
 
+//OK, TESTED, WORKING
+void DBManager::setColumnHeaderText(int column, const QString &text)
+{
+    query->prepare("SELECT header_text "
+                   "FROM tables_settings "
+                   "WHERE table_id=:tid "
+                   "AND column_id=:col");
+    query->bindValue(":tid", current_table_id);
+    query->bindValue(":col", column);
+    if (!query->exec())
+    {
+        emit queryError("Please check your database connection");
+        return;
+    }
+    if (query->size() == 0)
+    {
+        query->prepare("INSERT INTO tables_settings "
+                       "VALUES (:tid, :col, :width, :text)");
+        query->bindValue(":tid", current_table_id);
+        query->bindValue(":col", column);
+        query->bindValue(":width", cfg->getCellsSize().width());
+        query->bindValue(":text", text);
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
+    }
+    else
+    {
+        query->prepare("UPDATE tables_settings "
+                       "SET header_text=:txt "
+                       "WHERE table_id=:tid "
+                       "AND column_id=:col");
+        query->bindValue(":txt", text);
+        query->bindValue(":tid", current_table_id);
+        query->bindValue(":col", column);
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
+    }
+}
+
+//OK, TESTED, WORKING
 void DBManager::setRowHeight(int row, int oldSize, int newSize)
 {
     query->prepare(QString("SELECT row_height FROM %1 "
@@ -907,6 +1158,7 @@ void DBManager::setRowHeight(int row, int oldSize, int newSize)
     }
 }
 
+//OK, TESTED, WORKING
 void DBManager::createFolder(const QString &name, const QString &parent)
 {
     if (!query->exec("SELECT val FROM current_ids WHERE type='folder'"))
@@ -938,6 +1190,7 @@ void DBManager::createFolder(const QString &name, const QString &parent)
     emit dataModified(getTables(), getFolders());
 }
 
+//CORECTARE PENTRU TABELELE LA CARE UTIL NU ARE DREPTURI
 void DBManager::removeFolder(const QString &name)
 {
     bool removeChildren = cfg->removeChildren();
@@ -954,19 +1207,27 @@ void DBManager::removeFolder(const QString &name)
     int folder_index = -1;
     while (query->next())
         folder_index = query->value(0).toInt();
-
-    query->prepare("DELETE FROM folders "
-                   "WHERE folder_id=:fid");
+    
+    //FIX - SUBFOLDERS !
+    query->prepare("SELECT file_id "
+                   "FROM files "
+                   "WHERE folder=:fid "
+                   "AND owner <> :uid");
     query->bindValue(":fid", folder_index);
+    query->bindValue(":uid", current_user_id);
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
         return;
     }
+    if (query->size() > 0)
+    {
+        emit queryError("Unable to delete - the folder contains tables you don't own");
+        return;
+    }
 
-    query->prepare("UPDATE folders "
-                   "SET folder_id=folder_id-1 "
-                   "WHERE folder_id>:fid");
+    query->prepare("DELETE FROM folders "
+                   "WHERE folder_id=:fid");
     query->bindValue(":fid", folder_index);
     if (!query->exec())
     {
@@ -1000,6 +1261,7 @@ void DBManager::removeFolder(const QString &name)
         QString q = "";
         for (int i=0; i<tables.length(); i++)
         {
+            //REPLACE WITH DELETE TABLE FUNCTION
             if (backupTables)
                 q = QString("ALTER TABLE %1 RENAME TO %1_temp").arg((QString)(tables.at(i)));
             else
@@ -1019,6 +1281,7 @@ void DBManager::removeFolder(const QString &name)
             return;
         }
 
+        //FIX - SUBFOLDERS !
         query->prepare("DELETE FROM folders "
                        "WHERE folder_parent=:fname");
         query->bindValue(":fname", name);
@@ -1050,6 +1313,7 @@ void DBManager::removeFolder(const QString &name)
     emit dataModified(getTables(), getFolders());
 }
 
+//OK, TESTED, WORKING
 void DBManager::removeTable(const QString& name)
 {
     query->prepare("SELECT file_id, table_name, owner "
@@ -1061,11 +1325,10 @@ void DBManager::removeTable(const QString& name)
         emit queryError("Please check your database connection");
         return;
     }
-
-    QSqlRecord record = query->record();
-    if (record.count() == 0)
+    if (query->size() == 0)
         return;
 
+    QSqlRecord record = query->record();
     int file_id = 0;
     int owner = 0;
     QString tableName = "";
@@ -1076,18 +1339,22 @@ void DBManager::removeTable(const QString& name)
         owner = query->value(record.indexOf("owner")).toInt();
     }
     if (owner != current_user_id)
+    {
+        emit queryError("Only the table's onwer can delete it");
         return;
+    }
 
     bool backupTables = cfg->backupTables();
     QString q = QString();
     if (backupTables)
-    {
+    {       
         QDate expireDate;
         int daysToKeep = cfg->getBackupExpireDate();
         if (daysToKeep == 0)
-            expireDate = QDate::fromString("9999-12-31", "yyyy-MM-dd");
+            expireDate = QDate(2999, 12, 28);
         else
             expireDate = QDate::currentDate().addDays(daysToKeep);
+        
         QString backupTableName = QString("%1_temp").
                                   arg(tableName).
                                   append(expireDate.toString("yyyyMMdd"));
@@ -1099,11 +1366,11 @@ void DBManager::removeTable(const QString& name)
             return;
         }
 
-        query->prepare("INSERT INTO backup VALUES (:tableName, :date, :uid)");
-        query->bindValue(":tableName", backupTableName);
-        query->bindValue(":date", expireDate.toString("yyyy-MM-dd"));
-        query->bindValue(":uid", current_user_id);
-        if (!query->exec())
+        q = QString("INSERT INTO backup VALUES ('%1', '%2', %3)").
+                arg(backupTableName).
+                arg(expireDate.toString("yyyy-MM-dd")).
+                arg(current_user_id);
+        if (!query->exec(q))
         {
             emit queryError("Please check your database connection");
             return;
@@ -1117,26 +1384,37 @@ void DBManager::removeTable(const QString& name)
             emit queryError("Please check your database connection");
             return;
         }
-        q = QString("DELETE FROM rights WHERE table_id=%1").arg(file_id);
-        if (!query->exec(q))
+        
+        query->prepare("DELETE FROM rights "
+                       "WHERE table_id=:tid");
+        query->bindValue(":tid", file_id);
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
+        
+        query->prepare("DELETE FROM tables_settings "
+                       "WHERE table_id=:tid");
+        query->bindValue(":tid", file_id);
+        if (!query->exec())
+        {
+            emit queryError("Please check your database connection");
+            return;
+        }
+        
+        query->prepare("DELETE FROM access_keys "
+                       "WHERE table_id=:tid");
+        query->bindValue(":tid", file_id);
+        if (!query->exec())
         {
             emit queryError("Please check your database connection");
             return;
         }
     }
 
-    query->prepare("DELETE FROM files WHERE file_id=:f_id");
-    query->bindValue(":f_id", file_id);
-    if (!query->exec())
-    {
-        emit queryError("Please check your database connection");
-        return;
-    }
-
-    query->prepare("UPDATE files "
-                   "SET file_id=file_id-1 "
-                   "WHERE file_id>:f_id");
-    query->bindValue(":f_id", file_id);
+    query->prepare("DELETE FROM files WHERE file_id=:fid");
+    query->bindValue(":fid", file_id);
     if (!query->exec())
     {
         emit queryError("Please check your database connection");
@@ -1150,9 +1428,14 @@ void DBManager::removeTable(const QString& name)
         emit queryError("Please check your database connection");
         return;
     }
+    
+    if (current_table->compare(tableName) == 0)
+        emit closeCurrentTable();
+    
     emit dataModified(getTables(), getFolders());
 }
 
+//OK, TESTED, WORKING
 void DBManager::changeKey(const QString &oldPrivateKey, 
                           const QString &publicKey, 
                           const QString &privateKey, 
@@ -1185,94 +1468,20 @@ void DBManager::changeKey(const QString &oldPrivateKey,
         accessKeys.append(query->value(0).toString());
     for (int i=0; i<accessKeys.length(); i++)
     {
+        QString accKey = Security::RSADecrypt(accessKeys.at(i),
+                                              oldPrivateKey,
+                                              passphrase);
         query->prepare("UPDATE access_keys "
-                       "SET access_key=:newKey "
+                       "SET access_key=:newKey, "
+                       "signed_key=:newSign "
                        "WHERE user_id=:uid");
-        query->bindValue(":newKey", security->RSAEncrypt(
-                             Security::RSADecrypt(accessKeys.at(i),
-                                                  oldPrivateKey,
-                                                  passphrase)));
+        query->bindValue(":newKey", security->RSAEncrypt(accKey));
+        query->bindValue(":newSign", security->RSASign(accKey));
         query->bindValue(":uid", current_user_id);
         if (!query->exec())
         {
             emit queryError("Please check your database connection");
             continue;
-        }
-    }
-
-    query->prepare("SELECT f.table_name, k.access_key "
-                   "FROM files f, access_keys k "
-                   "WHERE f.owner=:uid "
-                   "AND k.table_id=f.file_id");
-    query->bindValue(":uid", current_user_id);
-    if (!query->exec())
-    {
-        emit queryError("Please check your database connection");
-        return;
-    }
-
-    QStringList tables = QStringList();
-    QStringList keys = QStringList();
-    while (query->next())
-    {
-        tables.append(query->value(0).toString());
-        keys.append(security->RSADecrypt(query->value(1).toString()));
-    }
-
-    
-    
-    QList<QStringList> encryptedData = QList<QStringList>();
-    for (int i=0; i<tables.length(); i++)
-    {
-        if (!query->exec(QString("SELECT * FROM %1").
-                       arg(tables.at(i))))
-        {
-            emit queryError("Please check your database connection");
-            return;
-        }
-
-        int columns = query->record().count();
-        QStringList encryptedRow = QStringList();
-        while (query->next())
-        {
-            encryptedRow.clear();
-            for (int c=2; c<columns; c++)
-            {
-                QString data = query->value(c).toString();
-                if (data == "")
-                    encryptedRow.append("");
-                else
-                {
-                    QString decrypted = Security::AESDecrypt(data, keys.at(i));
-                    encryptedRow.append(Security::AESEncrypt(decrypted, keys.at(i)));
-                }
-            }
-            encryptedData.append(encryptedRow);
-        }
-
-        if (!query->exec(QString("DELETE FROM %1").arg(tables.at(i))))
-        {
-            emit queryError("Please check your database connection");
-            return;
-        }
-
-        for (int r=0; r<encryptedData.length(); r++)
-        {
-            QString timestamp = QDate::currentDate().toString("dd/MM/yyyy");
-            timestamp.append("&");
-            timestamp.append(QTime::currentTime().toString("hh:mm:ss:zzz"));
-
-            QString aux = QString("INSERT INTO %1 VALUES (%2, '%3', '").
-                          arg(tables.at(i)).arg(r).arg(timestamp);
-            for (int c=0; c<encryptedRow.length(); c++)
-                aux.append(encryptedData.at(r).at(c)).append("', '");
-            aux.remove(aux.length()-3, 3);
-            aux.append(")");
-            if (!query->exec(aux))
-            {
-                emit queryError("Please check your database connection");
-                return;
-            }
         }
     }
 }

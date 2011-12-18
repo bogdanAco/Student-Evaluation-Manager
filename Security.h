@@ -11,24 +11,29 @@ public:
     ~Security();
 
     bool setAESkey(const QString &key);
+    QString getAESkey();
     QString AESEncrypt(const QString &data) const;
     QString AESDecrypt(const QString &data) const;
 
-    bool setRSAkeys(const QString &pubkey,
-                    const QString &prvkey,
+    bool setRSAkeys(const QString &pubKeyData,
+                    const QString &prvKeyData,
                     const QString &passphrase);
     QString RSAEncrypt(const QString &data) const;
     QString RSADecrypt(const QString &data) const;
+    QString RSASign(const QString &data) const;
 
     static QString AESEncrypt(const QString &data,
                               const QString &key);
     static QString AESDecrypt(const QString &data,
                               const QString &key);
     static QString RSAEncrypt(const QString &data,
-                              const QString &pubkey);
+                              const QString &pubkeyData);
     static QString RSADecrypt(const QString &data,
-                              const QString &prvkey,
+                              const QString &prvkeyData,
                               const QString &passphrase);
+    static bool RSAVerifySignature(const QString &data,
+                            const QString &signedData,
+                            const QString &pubKeyData);
     static QString getHash(const QString &text);
     static QString generateAESKey();
     static QPair<QString, QString>
@@ -39,8 +44,8 @@ private:
     QCA::SymmetricKey *AESkey;
     QCA::InitializationVector *AESiv;
     QCA::Cipher *AEScipher;
-    QCA::PublicKey *RSApublic;
-    QCA::PrivateKey *RSAprivate;
+    QCA::RSAPublicKey *RSApublic;
+    QCA::RSAPrivateKey *RSAprivate;
 };
 
 #endif // SECURITY_H

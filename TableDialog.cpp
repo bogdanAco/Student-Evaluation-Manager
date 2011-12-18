@@ -40,18 +40,20 @@ TableDialog::TableDialog(const QString &title, const QString &text,
     connect(this, SIGNAL(okPressed()), this, SLOT(checkValidity()));
 }
 
-void TableDialog::loadTreeData(const QList<QPair<QString, QString> > &tables,
-                               const QList<QPair<QString, QString> > &folders)
+void TableDialog::loadTreeData(const QHash<QString, QString> &tables, 
+                               const QHash<QString, QString> &folders)
 {
     QList<QTreeWidgetItem*> items = removeTreeItemChildren(root);
     for (int i=items.length()-1; i>=0; i--)
         delete items.at(i);
-
-    for (int i=0; i<folders.length(); i++)
+    
+    QHashIterator<QString, QString> foldersIt(folders);
+    while (foldersIt.hasNext())
     {
-        QString folderName = folders.at(i).first;
-        QString parentName = folders.at(i).second;
-
+        foldersIt.next();
+        QString folderName = foldersIt.key();
+        QString parentName = foldersIt.value();
+        
         TreeItem *item = 0;
         if (parentName == "")
             item = new TreeItem(TreeItem::Folder, root);
@@ -69,12 +71,14 @@ void TableDialog::loadTreeData(const QList<QPair<QString, QString> > &tables,
         item->setText(0, folderName);
         item->setExpanded(true);
     }
-
-    for (int i=0; i<tables.length(); i++)
+    
+    QHashIterator<QString, QString> tablesIt(tables);
+    while (tablesIt.hasNext())
     {
-        QString tableName = tables.at(i).first;
-        QString parentName = tables.at(i).second;
-
+        tablesIt.next();
+        QString tableName = tablesIt.key();
+        QString parentName = tablesIt.value();
+        
         TreeItem *item = 0;
         if (parentName == "Root")
             item = new TreeItem(TreeItem::Table, root);
@@ -108,11 +112,11 @@ TableDialog::~TableDialog()
 
 void TableDialog::showSelectedItem()
 {
-    QTreeWidgetItem *selectedItem = treeView->currentItem();
+    TreeItem *selectedItem = (TreeItem*)treeView->currentItem();
     if (selectedItem != 0)
     {
         QString selectedItemName = selectedItem->text(0);
-        if (isTable((TreeItem*)selectedItem))
+        if (isTable(selectedItem))
             tableName->setText(selectedItemName);
         else
             tableName->setText("");
@@ -122,15 +126,14 @@ void TableDialog::showSelectedItem()
 void TableDialog::deleteTable()
 {
     showMessage("");
-    QTreeWidgetItem *selectedItem = treeView->currentItem();
+    TreeItem *selectedItem = (TreeItem*)treeView->currentItem();
     if (selectedItem == 0)
     {
         showMessage("No table selected");
         return;
     }
     QString selectedItemName = selectedItem->text(0);
-    if (isFolder((TreeItem*)selectedItem) ||
-        selectedItemName.length() == 0)
+    if (isFolder(selectedItem) || selectedItemName.length() == 0)
     {
         showMessage("No table selected");
         return;
@@ -143,15 +146,14 @@ void TableDialog::deleteTable()
 void TableDialog::deleteFolder()
 {
     showMessage("");
-    QTreeWidgetItem *selectedItem = treeView->currentItem();
+    TreeItem *selectedItem = (TreeItem*)treeView->currentItem();
     if (selectedItem == 0)
     {
         showMessage("No folder selected");
         return;
     }
     QString selectedItemName = selectedItem->text(0);
-    if (isTable((TreeItem*)selectedItem) ||
-        selectedItemName.length() == 0)
+    if (isTable(selectedItem) || selectedItemName.length() == 0)
     {
         showMessage("No folder selected");
         return;
@@ -192,8 +194,8 @@ void TableDialog::createFolder(const QString &name)
     }
     else
     {
-        QTreeWidgetItem *item = treeView->currentItem();
-        if (isTable((TreeItem*)item))
+        TreeItem *item = (TreeItem*)treeView->currentItem();
+        if (isTable(item))
             emit okToCreateFolder(name, item->parent()->text(0));
         else
             emit okToCreateFolder(name, item->text(0));
@@ -329,6 +331,9 @@ NewTableDialog::NewTableDialog(const CFGManager *cfg, QWidget *parent) :
     rowCount = new QLineEdit(QString("%1").arg(cfg->getRowCount()));
     rowCount->setMaxLength(4);
     mainLayout->addWidget(rowCount, 6, 2, 1, 2);
+    
+    disconnect(treeView, SIGNAL(itemSelectionChanged()),
+               this, SLOT(showSelectedItem()));
 }
 
 NewTableDialog::~NewTableDialog()
@@ -374,9 +379,8 @@ void NewTableDialog::checkValidity()
         showMessage("Invalid row number");
         return;
     }
-
     emit dataChecked(tableName->text(), cols, rows,
-                     treeView->selectedItems()[0]->text(0));
+                     treeView->selectedItems()[0]->text(0));   
     this->hide();
 }
 

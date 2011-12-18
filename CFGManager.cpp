@@ -2,6 +2,7 @@
 
 CFGManager::CFGManager()
 {
+    root = 0;
     currentUser = 0;
     domDoc = new QDomDocument();
     XMLFile = new QFile("config.xml");
@@ -94,7 +95,7 @@ bool CFGManager::removeChildren() const
         return false;
     }
 
-    QString aux = currentUser->firstChildElement("database").
+    QString aux = currentUser->firstChildElement("tables").
                   firstChildElement("delete_folder_content").
                   text();
     return (aux == "true")?true:false;
@@ -108,7 +109,7 @@ bool CFGManager::backupTables() const
         return "";
     }
 
-    QString aux = currentUser->firstChildElement("database").
+    QString aux = currentUser->firstChildElement("tables").
                   firstChildElement("backup_deleted_tables").
                   text();
     return (aux == "true")?true:false;
@@ -122,7 +123,7 @@ int CFGManager::getBackupExpireDate() const
         return -1;
     }
 
-    return currentUser->firstChildElement("database").
+    return currentUser->firstChildElement("tables").
             firstChildElement("backup_expire_after").text().toInt();
 }
 
@@ -237,7 +238,7 @@ void CFGManager::setCurrentUser(const QString &name) const
     if (node.isNull())
     {
         currentUser = new QDomElement(domDoc->createElement(name));
-            QDomElement database = domDoc->createElement("database");
+            QDomElement database = domDoc->createElement("tables");
             currentUser->appendChild(database);
                 QDomElement removeChildren =
                         domDoc->createElement("delete_folder_content");
@@ -375,7 +376,7 @@ void CFGManager::setRemoveChildren(bool remove)
     }
 
     QString aux = remove?"true":"false";
-    QDomElement currentValue(currentUser->firstChildElement("database").
+    QDomElement currentValue(currentUser->firstChildElement("tables").
                             firstChildElement("delete_folder_content"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(aux));
@@ -390,7 +391,7 @@ void CFGManager::setBackupTables(bool backup)
     }
 
     QString aux = backup?"true":"false";
-    QDomElement currentValue(currentUser->firstChildElement("database").
+    QDomElement currentValue(currentUser->firstChildElement("tables").
                             firstChildElement("backup_deleted_tables"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(aux));
@@ -404,7 +405,7 @@ void CFGManager::setBackupExpireDate(int afterNDays)
         return;
     }
 
-    QDomElement currentValue(currentUser->firstChildElement("database").
+    QDomElement currentValue(currentUser->firstChildElement("tables").
                             firstChildElement("backup_expire_after"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(QString("%1").arg(afterNDays)));
