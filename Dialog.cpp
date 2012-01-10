@@ -23,8 +23,8 @@ Dialog::Dialog(const QString &title, const QString &text, QWidget* parent) :
     connect(cancel,SIGNAL(clicked()),this,SLOT(close()));
     mainLayout->addWidget(cancel, 16, 3, Qt::AlignRight);
 
-    connect(ok, SIGNAL(clicked()), this, SLOT(emitOKSignal()));
-    connect(cancel, SIGNAL(clicked()), this, SLOT(emitCancelSignal()));
+    connect(ok, SIGNAL(clicked()), this, SIGNAL(okPressed()));
+    connect(cancel, SIGNAL(clicked()), this, SIGNAL(cancelPressed()));
 }
 
 Dialog::~Dialog()
@@ -40,16 +40,6 @@ Dialog::~Dialog()
 QString Dialog::getText()
 {
     return this->text->text();
-}
-
-void Dialog::emitOKSignal()
-{
-    emit okPressed();
-}
-
-void Dialog::emitCancelSignal()
-{
-    emit cancelPressed();
 }
 
 void Dialog::showMessage(const QString &msg)
@@ -142,7 +132,7 @@ UserLoginDialog::UserLoginDialog(QWidget *parent) :
 
     connect(this, SIGNAL(okPressed()), this, SLOT(checkData()));
     connect(this, SIGNAL(dataChecked(QString,QString)),
-            this, SLOT(saveLoginData(QString,QString)));
+            this, SIGNAL(saveLoginDataSignal(QString,QString)));
 }
 
 void UserLoginDialog::showMessage(const QString &msg)
@@ -166,12 +156,6 @@ void UserLoginDialog::checkData()
         return;
     }
     emit dataChecked(usrnm->text(), passwd->text());
-}
-
-void UserLoginDialog::saveLoginData(const QString &name,
-                                    const QString &password)
-{
-    emit saveLoginDataSignal(name, password);
 }
 
 UserLoginDialog::~UserLoginDialog()
@@ -425,6 +409,7 @@ void FormulaDialog::addRangeItems()
         return;
     }
 
+    range->setText("");
     QTableWidgetSelectionRange selected = spreadsheet->selectedRange();
     for (int i=selected.topRow(); i<=selected.bottomRow(); i++)
         for (int j=selected.leftColumn(); j<=selected.rightColumn(); j++)

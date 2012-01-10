@@ -18,8 +18,7 @@ public:
     QString currentFormula() const;
     QTableWidgetSelectionRange selectedRange() const;
     QTimer *getTimer() const;
-    int getNonzeroRowCount(int column) const;
-    int getMaxNonzeroRowCount() const;
+    void setRefreshTime(int sec) const;
     void replaceTimestamp(int index, const QString &newVal) const;
     void addTimestamp(int index, const QString &ts) const;
     int timestampCount() const;
@@ -37,7 +36,6 @@ private:
     Cell* cell(int row,int column) const;
     QString text(int row, int column) const;
     QString formula(int row, int column) const;
-    //mutable QStringList *timestamps;
     mutable QMap<int,QString> *timestamps;
 
 signals:
@@ -67,8 +65,6 @@ public slots:
     void setColumnsHeaderText(const QMap<int, QString> data);
     void selectCurrentRow();
     void selectCurrentColumn();
-    void findNext(const QString &str, Qt::CaseSensitivity cs);
-    void findPrevious(const QString &str, Qt::CaseSensitivity cs);
     void addColumns(int columns);
     void addRows(int rows);
     void removeColumns(const QList <int> column_ids);

@@ -2,6 +2,7 @@
 #define CFGMANAGER_H
 
 #include <QtXml>
+#include <QAbstractItemView>
 
 class CFGManager : public QObject
 {
@@ -23,7 +24,7 @@ public:
     int getRowCount() const;
     int getColumnCount() const;
     int getRefreshTime() const;
-    int getSelectionMode() const;
+    QAbstractItemView::SelectionMode getSelectionMode() const;
     QString getSelectionModeText() const;
     QSize getCellsSize() const;
     //security configuration

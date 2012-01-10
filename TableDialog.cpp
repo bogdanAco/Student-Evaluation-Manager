@@ -133,7 +133,7 @@ void TableDialog::deleteTable()
         return;
     }
     QString selectedItemName = selectedItem->text(0);
-    if (isFolder(selectedItem) || selectedItemName.length() == 0)
+    if (selectedItemName.length() == 0 || isFolder(selectedItemName))
     {
         showMessage("No table selected");
         return;

@@ -163,26 +163,26 @@ int CFGManager::getRefreshTime() const
             firstChildElement("refresh_time").text().toInt();
 }
 
-int CFGManager::getSelectionMode() const
+QAbstractItemView::SelectionMode CFGManager::getSelectionMode() const
 {
     if (currentUser == 0)
     {
         emitErrorMessage(NoUser);
-        return 0;
+        return QAbstractItemView::NoSelection;
     }
 
     QString mode =  currentUser->firstChildElement("spreadsheet").
                     firstChildElement("selection_mode").text();
     if (mode == "SingleSelection")
-        return 1;
+        return QAbstractItemView::SingleSelection;
     else if (mode == "ContiguousSelection")
-        return 4;
+        return QAbstractItemView::ContiguousSelection;
     else if (mode == "ExtendedSelection")
-        return 3;
+        return QAbstractItemView::ExtendedSelection;
     else if (mode == "MultiSelection")
-        return 2;
+        return QAbstractItemView::MultiSelection;
     else
-        return 0; //NoSelection
+        return QAbstractItemView::NoSelection;
 }
 
 QString CFGManager::getSelectionModeText() const

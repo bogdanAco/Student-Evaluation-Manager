@@ -29,8 +29,6 @@ signals:
     void cancelPressed();
 
 protected slots:
-    void emitOKSignal();
-    void emitCancelSignal();
     void showMessage(const QString &msg);
 };
 
@@ -102,8 +100,6 @@ signals:
                              const QString &password);
 protected slots:
     virtual void checkData();
-    void saveLoginData(const QString &name,
-                       const QString &password);
 };
 
 class UserSignInDialog : public UserLoginDialog

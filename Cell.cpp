@@ -7,12 +7,12 @@ Cell::Cell(const QString &text) : QTableWidgetItem(text) { }
 
 QVariant Cell::data(int role) const
 {
-    if (role == Qt::EditRole || role == Qt::StatusTipRole)
+    if (role == Qt::EditRole)
         return formula();
     else if (role == Qt::DisplayRole)
         return display();
     else if (role == Qt::TextAlignmentRole)
-        return int(Qt::AlignRight | Qt::AlignVCenter);
+        return int(Qt::AlignLeft | Qt::AlignVCenter);
     else
         return QTableWidgetItem::data(role);
 }
@@ -179,7 +179,7 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
         if (simple_function_names.contains(s))
         {
             QVariantList values;
-            QRegExp pattern("^([A-Z][0-9]{1,3})$");
+            QRegExp pattern("^([A-Z][1-9][0-9]*)$");
             foreach (QString str, parameters)
                 if (pattern.exactMatch(str))
                 {
@@ -246,7 +246,7 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
                 //if(A1<5;"Picat";n)
                 //if(A1<5;4)
 
-                QRegExp pattern("^([A-Z]\\d{1,3}(<|<=|>|>=|<>|=)(([A-Z]\\d{1,3})|(\\d+(\\.\\d+)?)))$");
+                QRegExp pattern("^([A-Z][1-9][0-9]*(<|<=|>|>=|<>|=)(([A-Z]\\d{1,3})|(\\d+(\\.\\d+)?)))$");
                 if (pattern.exactMatch(parameters[0]))
                 {
                     QString condition = parameters[0];
@@ -275,12 +275,12 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
                     if (param_no == 2)
                     {
                         QString empty_str = "";
-                        return compareMembers(param_no, length, op,
+                        return compareMembers(param_no, op,
                                               firstOperand, secondOperand,
                                               parameters[1], empty_str);
                     }
                     else if (param_no == 3)
-                        return compareMembers(param_no, length, op,
+                        return compareMembers(param_no, op,
                                               firstOperand, secondOperand,
                                               parameters[1], parameters[2]);
                     else
@@ -327,7 +327,7 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
                                                     arg(parameters[i]));
                                 return "#####";
                             }
-                            if (compareMembers(length, op, firstOperand, secondOperand))
+                            if (compareMembers(op, firstOperand, secondOperand))
                                 count++;
                         }
                     return count;
@@ -373,78 +373,104 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
     return "#####";
 }
 
-QString Cell::compareMembers(int &param_no, int &op_len, const QString &op,
+QString Cell::compareMembers(int &param_no, const QString &op,
                     double &firstOperand, double &secondOperand,
                     const QString &case1, const QString &case2) const
 {
-    if (op == "<" || op == "<=")
+    if (op.size() == 1)
     {
-        if (op_len == 1 && firstOperand < secondOperand)
-            return case1;
-        else if (op_len == 2 && firstOperand <= secondOperand)
-            return case1;
-        else if (param_no == 3)
-            return case2;
+        if (op == "<")
+        {
+            if (firstOperand < secondOperand)
+                return case1;
+            else if (param_no == 3)
+                return case2;
+        }
+        else if (op == ">")
+        {
+            if (firstOperand > secondOperand)
+                return case1;
+            else if (param_no == 3)
+                return case2;
+        }
+        else if (op == "=")
+        {
+            if (firstOperand == secondOperand)
+                return case1;
+            else if (param_no == 3)
+                return case2;
+        }
     }
-    else if (op == ">" || op == ">=")
+    else if (op.size() == 2)
     {
-        if (op_len == 1 && firstOperand > secondOperand)
-            return case1;
-        else if (op_len == 2 && firstOperand >= secondOperand)
-            return case1;
-        else if (param_no == 3)
-            return case2;
-    }
-    else if (op == "<>")
-    {
-        if (firstOperand != secondOperand)
-            return case1;
-        else if (param_no == 3)
-            return case2;
-    }
-    else if (op == "=")
-    {
-        if (firstOperand == secondOperand)
-            return case1;
-        else if (param_no == 3)
-            return case2;
+        if (op == "<=")
+        {
+            if (firstOperand <= secondOperand)
+                return case1;
+            else if (param_no == 3)
+                return case2;
+        }
+        else if (op == ">=")
+        {
+            if (firstOperand >= secondOperand)
+                return case1;
+            else if (param_no == 3)
+                return case2;
+        }
+        else if (op == "<>")
+        {
+            if (firstOperand != secondOperand)
+                return case1;
+            else if (param_no == 3)
+                return case2;
+        }
     }
     emit invalidFormula(QString("Invalid operator: ").append(op));
     return "#####";
 }
 
-bool Cell::compareMembers(int &op_len, const QString &op,
-                    double &firstOperand, double &secondOperand) const
+bool Cell::compareMembers(const QString &op, double &firstOperand, double &secondOperand) const
 {
-    if (op == "<" || op == "<=")
+    if (op.size() == 1)
     {
-        if (op_len == 1 && firstOperand < secondOperand)
-            return true;
-        else if (op_len == 2 && firstOperand <= secondOperand)
-            return true;
+        if (op == "<")
+        {
+            if (firstOperand < secondOperand)
+                return true;
+        }
+        else if (op == ">")
+        {
+            if (firstOperand > secondOperand)
+                return true;
+        }
+        else if (op == "=")
+        {
+            if (firstOperand == secondOperand)
+                return true;
+        }
         return false;
     }
-    else if (op == ">" || op == ">=")
+    else if (op.size() == 2)
     {
-        if (op_len == 1 && firstOperand > secondOperand)
-            return true;
-        else if (op_len == 2 && firstOperand >= secondOperand)
-            return true;
+        if (op == "<=")
+        {
+            if (firstOperand <= secondOperand)
+                return true;
+        }
+        else if (op == ">=")
+        {
+            if (firstOperand >= secondOperand)
+                return true;
+        }
+        else if (op == "<>")
+        {
+            if (firstOperand != secondOperand)
+                return true;
+        }
         return false;
     }
-    else if (op == "<>")
-    {
-        if (firstOperand != secondOperand)
-            return true;
+    else
         return false;
-    }
-    else if (op == "=")
-    {
-        if (firstOperand == secondOperand)
-            return true;
-        return false;
-    }
-    return false;
 }
 
 QVariant Cell::getCellValue(const QString &id,
@@ -457,10 +483,8 @@ QVariant Cell::getCellValue(const QString &id,
     if (ok
         && row >= 0
         && column >= 0
-        && row < widget->height()
-        && column < widget->width()
-        && row != widget->currentRow()
-        && column != widget->currentColumn()
+        && row < widget->rowCount()
+        && column < widget->columnCount()
         )
     {
         const QTableWidgetItem* value = widget->item(row,column);

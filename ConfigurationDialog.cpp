@@ -150,7 +150,7 @@ void ConfigurationDialog::createSpreadSheetTab()
 
     spreadSheetLayout->addWidget(new QLabel("Column number:"));
     columnNo = new QSpinBox();
-    columnNo->setRange(1, 10);
+    columnNo->setRange(1, 20);
     columnNo->setValue(cfg->getColumnCount());
     spreadSheetLayout->addWidget(columnNo);
     connect(columnNo, SIGNAL(valueChanged(int)),

@@ -215,12 +215,12 @@ void MainWindow::CreateToolbars()
     fontColorButton = new QPushButton("Font color");
     connect(fontColorButton, SIGNAL(clicked()),
             this, SLOT(createSetFontColorDialog()));
-    colorPixmap->fill(QColor(0,0,0));
+    colorPixmap->fill(Qt::black);
     fontColorButton->setIcon(QIcon(*colorPixmap));
     backgroundColorButton = new QPushButton("Background color");
     connect(backgroundColorButton, SIGNAL(clicked()),
             this, SLOT(createSetBackgroundColorDialog()));
-    colorPixmap->fill(QColor(255,0,0));
+    colorPixmap->fill(Qt::white);
     backgroundColorButton->setIcon(QIcon(*colorPixmap));
     editToolBar->addWidget(fontButton);
     editToolBar->addWidget(fontColorButton);
@@ -249,7 +249,7 @@ void MainWindow::CreateToolbars()
     status = new QStatusBar(this);
     statusMsg = new QLabel(status);
     statusMsg->setStyleSheet("QLabel { color:red; }");
-    status->addPermanentWidget(statusMsg);
+    status->addPermanentWidget(statusMsg, 1);
     this->setStatusBar(status);
     timer = new QTimer(this);
     timer->start(5000);
@@ -358,6 +358,8 @@ void MainWindow::openNewTable(const QString &name, int columns, int rows)
 {
     Spreadsheet = new SpreadSheet(rows, columns, this);
     Spreadsheet->setCellsSize(config->getCellsSize());
+    Spreadsheet->setRefreshTime(config->getRefreshTime());
+    Spreadsheet->setSelectionMode(config->getSelectionMode());
     setCentralWidget(Spreadsheet);
     Spreadsheet->addActions(editActions);
     DBcon->setCurrentSpreadSheet(Spreadsheet);
@@ -423,8 +425,7 @@ void MainWindow::exportTable()
     if (!Spreadsheet->printSpreadSheet(table))
     {
         delete dialog;
-        dialog = new ErrorDialog("PDF export error - "
-                                 "append .pdf to table name", this);
+        dialog = new ErrorDialog("PDF export error", this);
         dialog->show();
     }
 }

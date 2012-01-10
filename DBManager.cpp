@@ -267,7 +267,7 @@ void DBManager::createUser(const QString &uname, const QString &pass)
         emit queryError("Please check your database connection");
         return;
     }
-    security->setRSAkeys(keys.first, keys.second, passphr);
+    //security->setRSAkeys(keys.first, keys.second, passphr);
 
     emit userCreated();
 }
@@ -440,10 +440,12 @@ bool DBManager::writeData(int line, int column, const QString& cell_data)
             query->prepare(QString("UPDATE %1 "
                                    "SET row_timestamp = :timestamp, "
                                    "field%2 = :fieldVal "
-                                   "WHERE row_index = :rowIndex").
+                                   "WHERE row_index = :rowIndex "
+                                   "AND field%2 <> '%3'").
                                     arg(*current_table).
-                                    arg(column));
+                                    arg(column).arg(dataToWrite));
         query->bindValue(":fieldVal", dataToWrite);
+        query->bindValue(":newVal", dataToWrite);
         query->bindValue(":timestamp", timestamp);
         query->bindValue(":rowIndex", line);
         if (!query->exec())
@@ -929,7 +931,7 @@ void DBManager::removeColumns(const QList <int> column_ids)
             emit queryError("Please check your database connection1");
             return;
         }
-        
+        //MODIFICARE PENTRU TOTI UTILIZATORII
         query->prepare("DELETE FROM rights "
                        "WHERE table_id=:tid "
                        "AND user_id=:uid "
@@ -1245,6 +1247,7 @@ void DBManager::removeFolder(const QString &name)
 
     if (removeChildren)
     {
+        //TREBUIE APELATA PROCEDURA DE STEREGERE A FISIERELOR
         QStringList tables = QStringList();
         query->prepare("SELECT table_name FROM files WHERE folder=:fid");
         query->bindValue(":fid", folder_index);
@@ -1281,6 +1284,7 @@ void DBManager::removeFolder(const QString &name)
             return;
         }
 
+        //TREBUIE APELATA RECURSIV PROCEDURA CURENTA
         //FIX - SUBFOLDERS !
         query->prepare("DELETE FROM folders "
                        "WHERE folder_parent=:fname");

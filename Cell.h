@@ -23,11 +23,10 @@ private:
     bool isValidFormula(const QString &formula) const;
     QVariant parseMember(const QString &formula,
                          const QTableWidget *widget) const;
-    QString compareMembers(int &param_no, int &op_len, const QString &op,
+    QString compareMembers(int &param_no, const QString &op,
                         double &firstOperand, double &secondOperand,
                         const QString &case1, const QString &case2) const;
-    bool compareMembers(int &op_len, const QString &op,
-                        double &firstOperand, double &secondOperand) const;
+    bool compareMembers(const QString &op, double &firstOperand, double &secondOperand) const;
     QVariant getCellValue(const QString &id,
                   const QTableWidget *widget) const;
     int firstOperatorPosition(const QString &formula) const;

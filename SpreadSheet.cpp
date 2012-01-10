@@ -40,84 +40,98 @@ SpreadSheet::~SpreadSheet()
 
 bool SpreadSheet::printSpreadSheet(const QString &fileName) const
 {
-        if (fileName.length() == 0)
-            return false;
-        if (!fileName.contains(".pdf", Qt::CaseSensitive))
-            return false;
-
-        QPrinter printer;
-        printer.setOutputFormat(QPrinter::PdfFormat);
-        printer.setOutputFileName(fileName);
-        int width = printer.width();
-        int sWidth = 0;
-        for (int i=0; i<columnCount(); i++)
-            sWidth += columnWidth(i);
-        int diff = (width - sWidth) / columnCount();
-
-        QPainter painter;
-
-        if (!painter.begin(&printer))
-            return false;
-
-        int x = 0;
-        int y = 0;
-        int incrY = 0;
-        int row_height = 20;
-
-        painter.setPen(QPen(Qt::black, 1));
-        //for (int i=-1; i<rowCount(); i++)
-        for (int i=-1; i<=getMaxNonzeroRowCount(); i++)
+    QString fname = fileName;
+    if (fname.length() == 0)
+        return false;
+    if (fname.right(4) != ".pdf")
+        fname.append(".pdf");
+    
+    QPrinter printer;
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(fname);
+    int width = printer.width();
+    int sWidth = 0;
+    for (int i=0; i<columnCount(); i++)
+        sWidth += columnWidth(i);
+    int diff = (width - sWidth) / columnCount();
+    
+    QPainter painter;
+    
+    if (!painter.begin(&printer))
+        return false;
+    
+    int x = 0;
+    int y = 0;
+    int incrY = 0;
+    int row_height = 20;
+    QBrush brush = painter.brush();
+    painter.setPen(QPen(QBrush(Qt::black), 0.5));
+    QPen pen = painter.pen();
+    
+    for (int i=-1; i<rowCount(); i++)
+    {
+        x = 0;
+        incrY = 0;
+        for (int j=0; j<columnCount(); j++)
         {
-            x = 0;
-            incrY = 0;
-            for (int j=0; j<columnCount(); j++)
+            QRect required = QRect();
+            QRect r = QRect(x, y, columnWidth(j)+diff, row_height);
+            painter.setBrush(cell(i,j)->background());
+            painter.drawRect(r);
+            painter.setBrush(brush);
+            QString text = (!cell(i,j))?"":cell(i,j)->text();
+            painter.setFont(!(cell(i,j))?font():cell(i,j)->font());
+            painter.setPen(cell(i,j)->foreground().color());
+            painter.drawText(r, cell(i,j)->textAlignment() | Qt::TextWrapAnywhere,
+                             text, &required);
+            painter.setPen(pen.color());
+            
+            if (required.height() > r.height())
             {
-                QRect required = QRect();
-                QRect r = QRect(x, y, columnWidth(j)+diff, row_height);
+                painter.eraseRect(r.x(), r.y(), r.width(), r.height()+1);
+                incrY = required.height() - r.height();
+                int aux_height = row_height;
+                row_height = required.height();
+                r.setHeight(row_height);
+                painter.setBrush(cell(i,j)->background());
                 painter.drawRect(r);
-                QString text = (!cell(i,j))?"":cell(i,j)->text();
-                painter.setFont(!(cell(i,j))?font():cell(i,j)->font());
-                painter.drawText(r, cell(i,j)->textAlignment() | Qt::TextWrapAnywhere,
-                                 text, &required);
-
-                if (required.height() > r.height())
+                painter.setBrush(brush);
+                painter.setPen(cell(i,j)->foreground().color());
+                painter.drawText(r, cell(i,j)->textAlignment() | Qt::TextWrapAnywhere, text);
+                painter.setPen(pen.color());
+                
+                int aux_x = x;
+                for (int k=j-1; k>=0; k--)
                 {
-                    painter.eraseRect(r.x(), r.y(), r.width(), r.height()+1);
-                    incrY = required.height() - r.height();
-                    int aux_height = row_height;
-                    row_height = required.height();
+                    aux_x -= columnWidth(k)+diff;
+                    r = QRect(aux_x, y, columnWidth(k)+diff, aux_height+1);
+                    painter.eraseRect(r);
                     r.setHeight(row_height);
+                    painter.setBrush(cell(i,k)->background());
                     painter.drawRect(r);
-                    painter.drawText(r, cell(i,j)->textAlignment() | Qt::TextWrapAnywhere, text);
-
-                    int aux_x = x;
-                    for (int k=j-1; k>=0; k--)
-                    {
-                        aux_x -= columnWidth(k)+diff;
-                        r = QRect(aux_x, y, columnWidth(k)+diff, aux_height+1);
-                        painter.eraseRect(r);
-                        r.setHeight(row_height);
-                        painter.drawRect(r);
-
-                        text = (!cell(i,k))?"":cell(i,k)->text();
-                        painter.setFont(!(cell(i,k))?font():cell(i,k)->font());
-                        painter.drawText(r, cell(i,k)->textAlignment() | Qt::TextWrapAnywhere,
-                                                     text);
-                    }
+                    painter.setBrush(brush);
+                    
+                    text = (!cell(i,k))?"":cell(i,k)->text();
+                    painter.setFont(!(cell(i,k))?font():cell(i,k)->font());
+                    painter.setPen(cell(i,k)->foreground().color());
+                    painter.drawText(r, cell(i,k)->textAlignment() | Qt::TextWrapAnywhere,
+                                     text);
+                    painter.setPen(pen.color());
                 }
-                x += columnWidth(j)+diff;
             }
-            row_height = 20;
-            if (y >= printer.height()-20)
-            {
-                printer.newPage();
-                y = 0;
-            }
-            else
-                y += row_height + incrY;
+            x += columnWidth(j)+diff;
         }
-        painter.end();
-        return true;
+        row_height = 20;
+        if (y >= printer.height()-row_height)
+        {
+            printer.newPage();
+            y = 0;
+        }
+        else
+            y += row_height + incrY;
+    }
+    painter.end();
+    return true;
 }
 
 QString SpreadSheet::currentLocation() const
@@ -150,11 +164,16 @@ QTimer *SpreadSheet::getTimer() const
     return this->refresh_timer;
 }
 
+void SpreadSheet::setRefreshTime(int sec) const
+{
+    int msec = sec*1000;
+    refresh_timer->setInterval(msec);
+}
+
 void SpreadSheet::replaceTimestamp(int index,
                       const QString &newVal) const
 {
-    if (index < timestamps->size())
-        timestamps->insert(index, newVal);
+    timestamps->insert(index, newVal);
 }
 
 void SpreadSheet::addTimestamp(int index, const QString &ts) const
@@ -303,44 +322,6 @@ QFont SpreadSheet::currentFont() const
         return QApplication::font();
     
     return item->font();
-}
-
-int SpreadSheet::getNonzeroRowCount(int column) const
-{
-    int count = 0;
-    QTableWidgetItem *aux = 0;
-    for (int i=0; i<rowCount(); i++)
-    {
-        aux = cell(i, column);
-        if (!aux)
-            continue;
-        else if (aux->text() != "")
-            count++;
-    }
-    delete aux;
-    return count;
-}
-
-int SpreadSheet::getMaxNonzeroRowCount() const
-{
-    int max = 0;
-    Cell *aux = 0;
-    for (int i=0; i<columnCount(); i++)
-    {
-        int count = 0;
-        for (int j=0; j<rowCount(); j++)
-        {
-            aux = cell(j, i);
-            if (!aux)
-                continue;
-            else if (aux->text() != "")
-                count++;
-        }
-        if (count > max)
-            max = count;
-    }
-    delete aux;
-    return max;
 }
 
 void SpreadSheet::clear()
@@ -560,53 +541,6 @@ void SpreadSheet::selectCurrentColumn()
     selectColumn(currentColumn());
 }
 
-void SpreadSheet::findNext(const QString &str, Qt::CaseSensitivity cs)
-{
-    int row = currentRow();
-    int column = currentColumn() + 1;
-
-    while (row < rowCount())
-    {
-        while (column < columnCount())
-        {
-            if (text(row, column).contains(str, cs))
-            {
-                clearSelection();
-                setCurrentCell(row, column);
-                activateWindow();
-                return;
-            }
-            ++column;
-        }
-        column = 0;
-        ++row;
-    }
-}
-
-void SpreadSheet::findPrevious(const QString &str,
-                               Qt::CaseSensitivity cs)
-{
-    int row = currentRow();
-    int column = currentColumn() - 1;
-
-    while (row >= 0)
-    {
-        while (column >= 0)
-        {
-            if (text(row, column).contains(str, cs))
-            {
-                clearSelection();
-                setCurrentCell(row, column);
-                activateWindow();
-                return;
-            }
-            --column;
-        }
-        column = columnCount() - 1;
-        --row;
-    }
-}
-
 void SpreadSheet::addColumns(int columns)
 {
     for (int i=0; i<columns; i++)
@@ -670,6 +604,8 @@ void SpreadSheet::somethingChanged(QTableWidgetItem *cell)
     if (cell == 0)
         return;
     
+    if (cell->font().family() == "")
+        cell->setFont(QApplication::font());
     QByteArray cellData;
     QDataStream out(&cellData, QIODevice::WriteOnly);
     out << cell->font() << cell->foreground() << cell->background() << 
@@ -719,8 +655,12 @@ void SpreadSheet::currentSelectionChanged()
 {
     QTableWidgetItem *item = currentItem();
     if (!item)
-        return;
-    
-    emit currentSelectionChanged(item->font(), item->background(),
-                                 item->foreground());
+        emit currentSelectionChanged(QApplication::font(), QBrush(Qt::white),
+                                     QBrush(Qt::black));
+    else if (item->font().family() == "")
+        emit currentSelectionChanged(QApplication::font(), QBrush(Qt::white),
+                                     QBrush(Qt::black));
+    else
+        emit currentSelectionChanged(item->font(), item->background(),
+                                     item->foreground());
 }
