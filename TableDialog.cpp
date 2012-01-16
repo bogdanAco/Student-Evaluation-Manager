@@ -315,7 +315,7 @@ void OpenTableDialog::checkValidity()
         return;
     }
     emit dataChecked(tableName->text(), 0, 0, "");
-    this->hide();
+    this->close();
 }
 
 NewTableDialog::NewTableDialog(const CFGManager *cfg, QWidget *parent) :
@@ -381,28 +381,22 @@ void NewTableDialog::checkValidity()
     }
     emit dataChecked(tableName->text(), cols, rows,
                      treeView->selectedItems()[0]->text(0));   
-    this->hide();
+    this->close();
 }
 
 ImportDataDialog::ImportDataDialog(QWidget *parent) :
     TableDialog("Import data", "Enter table name", parent)
 {
-    table = new SpreadSheet(6, 1, this);
-
-    mainLayout->addWidget(new QLabel("Data from row:"), 0, 0, 1, 3);
-
-    mainLayout->addWidget(new QLabel("Column:"), 0, 3, 1, 1);
-    columnNo = new QLineEdit();
-    mainLayout->addWidget(columnNo, 1, 3, 1, 1);
-
-    searchValue = new QLineEdit();
-    mainLayout->addWidget(searchValue, 1, 0, 1, 3);
-
-    search = new QPushButton("Get data");
-    mainLayout->addWidget(search, 6, 0, 1, 3);
-    connect(search, SIGNAL(pressed()), this, SLOT(getData()));
-
+    //setMaximumSize(800, 600);
+    table = new SpreadSheet(1, 1, this);
+    table->setSelectionMode(QAbstractItemView::SingleSelection);
     mainLayout->addWidget(this->table, 0, 4, 10, 1);
+    
+    load = new QPushButton("Load data");
+    mainLayout->addWidget(load, 9, 0, 1, 3);
+    connect(load, SIGNAL(pressed()), this, SLOT(getData()));
+    
+    ok->setEnabled(false);
 }
 
 SpreadSheet *ImportDataDialog::getSpreadsheet() const
@@ -412,43 +406,41 @@ SpreadSheet *ImportDataDialog::getSpreadsheet() const
 
 ImportDataDialog::~ImportDataDialog()
 {
-    delete columnNo;
-    delete searchValue;
-    delete search;
+    delete table;
 }
 
 void ImportDataDialog::checkValidity()
 {
     showMessage("");
 
-    if (table->currentItem()->text().length() == 0)
+    if (table->currentItem()->text().isEmpty())
     {
         showMessage("No item selected");
         return;
     }
+    else if (tableName->text().isEmpty())
+    {
+        showMessage("No document selected");
+        return;
+    }
 
-    //=link...
-    this->hide();
+    QString formula = QString("=link(%1;%2;%3;%4)").
+            arg(tableName->text()).
+            arg(table->currentRow()).
+            arg(table->currentColumn()).
+            arg(table->currentItem()->data(Qt::DisplayRole).toString());
+    emit link(formula);
+    this->close();
 }
 
 void ImportDataDialog::getData()
 {
+    if (tableName->text().isEmpty())
+    {
+        showMessage("No document selected");
+        return;
+    }
     showMessage("");
-
-    bool validCol;
-    int column = columnNo->text().toInt(&validCol);
-    if (!validCol)
-    {
-        showMessage("Please enter a number");
-        return;
-    }
-    if (column > table->rowCount() || column <= 0)
-    {
-        showMessage("Number must between 1 "
-                    "and table row number");
-        return;
-    }
-
-    emit getDataSignal(column-1, searchValue->text(),
-                       tableName->text());
+    emit getDataSignal(tableName->text());
+    ok->setEnabled(true);
 }

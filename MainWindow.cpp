@@ -17,14 +17,11 @@ MainWindow::MainWindow(const QString& title) : QMainWindow()
     DBcon = new DBManager(config);
     connect(DBcon, SIGNAL(queryError(QString)),
             this, SLOT(CreateErrorDialog(QString)));
-    connect(DBcon, SIGNAL(initializeDatabaseRequest()),
-            this, SLOT(initializeDatabase()));
+    connect(DBcon, SIGNAL(initializeDatabaseRequest(QString)),
+            this, SLOT(initializeDatabase(QString)));
     connect(DBcon, SIGNAL(closeCurrentTable()),
             this, SLOT(closeOpenedTable()));
-    if(DBcon->connectDB(config->getDBUser(), config->getDBPassword()))
-        createLoginDialog();
-    else
-        connected = false;
+    createDBLoginDialog();
 }
 
 void MainWindow::resetSize()
@@ -76,19 +73,19 @@ void MainWindow::CreateMenus()
 void MainWindow::CreateActions()
 {
     newTableAction = new QAction(QIcon("images/new.png"),
-                                "&New table",this);
+                                "&New",this);
     newTableAction->setShortcut(QKeySequence::New);
     connect(newTableAction,SIGNAL(triggered()),this,SLOT(newTable()));
     tableActions << newTableAction;
 
     openTableAction = new QAction(QIcon("images/open.png"),
-                                 "&Open table",this);
+                                 "&Open",this);
     openTableAction->setShortcut(QKeySequence::Open);
     connect(openTableAction,SIGNAL(triggered()),this,SLOT(openTable()));
     tableActions << openTableAction;
 
     closeTableAction = new QAction(QIcon("images/remove.png"),
-                                  "&Close table",this);
+                                  "&Close",this);
     closeTableAction->setShortcut(QKeySequence::Close);
     connect(closeTableAction,SIGNAL(triggered()),this,SLOT(closeTable()));
     tableActions << closeTableAction;
@@ -99,7 +96,7 @@ void MainWindow::CreateActions()
     tableActions << importTableAction;
 
     exportTableAction = new QAction(QIcon("images/save.png"),
-                                   "&Export PDF",this);
+                                   "&Save as PDF",this);
     exportTableAction->setShortcut(QKeySequence::Save);
     connect(exportTableAction,SIGNAL(triggered()),this,SLOT(exportTable()));
     exportTableAction->setDisabled(true);
@@ -145,29 +142,30 @@ void MainWindow::CreateActions()
     editActions << addRowAction;
 
     grantReadAccessAction = new QAction(QIcon("images/user.png"),
-                                        "&Grant read access", this);
+                                        "&Grant read rights", this);
     connect(grantReadAccessAction, SIGNAL(triggered()),
             this, SLOT(createGrantReadAccessDialog()));
     editActions << grantReadAccessAction;
     
     grantWriteAccessAction = new QAction(QIcon("images/user.png"),
-                               "&Grant write access", this);
+                               "&Grant write rights", this);
     connect(grantWriteAccessAction, SIGNAL(triggered()),
             this, SLOT(createGrantWriteAccessDialog()));
     editActions << grantWriteAccessAction;
 
     setHeaderTextAction = new QAction(QIcon("images/settings.png"),
-                               "&Set column header text",this);
+                               "&Set header",this);
     connect(setHeaderTextAction,SIGNAL(triggered()),this,SLOT(createSetColumnHeaderDialog()));
     editActions << setHeaderTextAction;
 
     resetHeaderTextAction = new QAction(QIcon("images/settings.png"),
-                               "&Reset column header text",this);
+                               "&Clear header",this);
     connect(resetHeaderTextAction,SIGNAL(triggered()),this,SLOT(createResetColumnHeaderDialog()));
     editActions << resetHeaderTextAction;
 
     formulaAction = new QAction(QIcon("images/formula.png"), "Formula:", this);
     connect(formulaAction,SIGNAL(triggered()),this,SLOT(createFormulaDialog()));
+    formulaActions << formulaAction;
 
     loginAction = new QAction(QIcon("images/user.png"),
                               "&Login",this);
@@ -193,58 +191,64 @@ void MainWindow::CreateActions()
 void MainWindow::CreateToolbars()
 {
     tableToolBar = new QToolBar("&Table", this);
-    //tableToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-    tableToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    tableToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    //tableToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     tableToolBar->setMovable(false);
     this->addToolBar(tableToolBar);
     tableToolBar->addActions(tableActions);
     tableToolBar->insertSeparator(importTableAction);
     tableToolBar->insertSeparator(exportTableAction);
-
-    editToolBar = new QToolBar("&Edit", this);
-    //editToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-    editToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    editToolBar->setMovable(false);
-    this->addToolBar(editToolBar);
-    editToolBar->addActions(editActions);
     
-    fontButton = new QPushButton();
-    connect(fontButton, SIGNAL(clicked()),
-            this, SLOT(createSetFontDialog()));
-    colorPixmap = new QPixmap(10, 10);
-    fontColorButton = new QPushButton("Font color");
-    connect(fontColorButton, SIGNAL(clicked()),
-            this, SLOT(createSetFontColorDialog()));
-    colorPixmap->fill(Qt::black);
-    fontColorButton->setIcon(QIcon(*colorPixmap));
-    backgroundColorButton = new QPushButton("Background color");
-    connect(backgroundColorButton, SIGNAL(clicked()),
-            this, SLOT(createSetBackgroundColorDialog()));
-    colorPixmap->fill(Qt::white);
-    backgroundColorButton->setIcon(QIcon(*colorPixmap));
-    editToolBar->addWidget(fontButton);
-    editToolBar->addWidget(fontColorButton);
-    editToolBar->addWidget(backgroundColorButton);
-    editToolBar->insertSeparator(addColumnAction);
-
     appToolBar = new QToolBar("&Application", this);
-    //appToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-    appToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    appToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    //appToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     appToolBar->setMovable(false);
     this->addToolBar(appToolBar);
     appToolBar->addActions(appActions);
 
+    editToolBar = new QToolBar("&Edit", this);
+    editToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    //editToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    editToolBar->setMovable(false);
+    this->addToolBar(editToolBar);
+    editToolBar->addActions(editActions);
+    
     this->addToolBarBreak();
 
     formulaToolBar = new QToolBar("Formula", this);
     formulaToolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     formulaToolBar->setMovable(false);
     this->addToolBar(formulaToolBar);
-    formulaToolBar->addAction(formulaAction);
+    formulaToolBar->addActions(formulaActions);
     cellFormula = new QLineEdit();
     cellFormula->setFixedWidth(400);
     cellFormula->setDisabled(true);
     formulaToolBar->addWidget(cellFormula);
+    formulaToolBar->addSeparator();
+    
+    fontButton = new QPushButton();
+    connect(fontButton, SIGNAL(clicked()),
+            this, SLOT(createSetFontDialog()));
+    colorPixmap = new QPixmap(10, 10);
+    fontColorButton = new QPushButton(" Font color");
+    connect(fontColorButton, SIGNAL(clicked()),
+            this, SLOT(createSetFontColorDialog()));
+    colorPixmap->fill(Qt::black);
+    fontColorButton->setIcon(QIcon(*colorPixmap));
+    fontColorButton->setLayoutDirection(Qt::RightToLeft);
+    backgroundColorButton = new QPushButton(" Background color");
+    connect(backgroundColorButton, SIGNAL(clicked()),
+            this, SLOT(createSetBackgroundColorDialog()));
+    colorPixmap->fill(Qt::white);
+    backgroundColorButton->setIcon(QIcon(*colorPixmap));
+    backgroundColorButton->setLayoutDirection(Qt::RightToLeft);
+    formulaToolBar->addWidget(new QLabel("Font: "));
+    formulaToolBar->addWidget(fontButton);
+    formulaToolBar->addSeparator();
+    formulaToolBar->addWidget(fontColorButton);
+    formulaToolBar->addSeparator();
+    formulaToolBar->addWidget(backgroundColorButton);
+    formulaToolBar->addSeparator();
     
     status = new QStatusBar(this);
     statusMsg = new QLabel(status);
@@ -258,9 +262,11 @@ void MainWindow::CreateToolbars()
 
 void MainWindow::CreateErrorDialog(const QString &message)
 {
-    delete dialog;
-    dialog = new ErrorDialog(message, this);
-    dialog->show();
+    ErrorDialog *err = new ErrorDialog(message, this);
+    err->show();
+    //delete dialog;
+    //dialog = new ErrorDialog(message, this);
+    //dialog->show();
 }
 
 void MainWindow::newTable()
@@ -329,7 +335,8 @@ void MainWindow::openTable()
     {
         CreateErrorDialog("Please login first");
         return;
-    }
+    }  
+    
     delete dialog;
     dialog = new OpenTableDialog(this);
     ((TableDialog*)dialog)->
@@ -356,6 +363,9 @@ void MainWindow::openTable()
 
 void MainWindow::openNewTable(const QString &name, int columns, int rows)
 {
+    if (Spreadsheet != 0)
+        delete Spreadsheet;
+
     Spreadsheet = new SpreadSheet(rows, columns, this);
     Spreadsheet->setCellsSize(config->getCellsSize());
     Spreadsheet->setRefreshTime(config->getRefreshTime());
@@ -387,14 +397,17 @@ void MainWindow::openNewTable(const QString &name, int columns, int rows)
 
 void MainWindow::closeTable()
 {
-    if (!connected || Spreadsheet == 0)
+    if (!connected)
     {
-        if (!connected)
-            CreateErrorDialog("Please login first");
-        else if (Spreadsheet == 0)
-            CreateErrorDialog("No table opened");
+        CreateErrorDialog("Please login first");
         return;
     }
+    else if (Spreadsheet == 0)
+    {
+        CreateErrorDialog("No table opened");
+        return;
+    }
+    
     delete dialog;
     dialog = new Dialog("Close table",
              "Are you sure you want to close the table ?",
@@ -409,7 +422,7 @@ void MainWindow::closeOpenedTable()
     DBcon->removeCurrentData();
     delete Spreadsheet;
     Spreadsheet = 0;
-    dialog->hide();
+    dialog->close();
     exportTableAction->setDisabled(true);
     cellFormula->setText("");
     cellFormula->setDisabled(true);
@@ -419,15 +432,13 @@ void MainWindow::closeOpenedTable()
 void MainWindow::exportTable()
 {
     QString table = QFileDialog::getSaveFileName(this);
-    if (table == "")
-        return;
-
-    if (!Spreadsheet->printSpreadSheet(table))
+    if (table.isEmpty())
     {
-        delete dialog;
-        dialog = new ErrorDialog("PDF export error", this);
-        dialog->show();
+        CreateErrorDialog("No file name entered");
+        return;
     }
+    if (!Spreadsheet->printSpreadSheet(table))
+        CreateErrorDialog("No file name entered");
 }
 
 void MainWindow::cut()
@@ -509,10 +520,12 @@ void MainWindow::logIn(int uid)
     if (uid == -1)
     {
         ((UserLoginDialog*)dialog)->showMessage("Invalid login data");
-        return;
     }
-    connected = true;
-    dialog->hide();
+    else
+    {
+        connected = true;
+        dialog->close();
+    }
 }
 
 void MainWindow::logOut()
@@ -700,10 +713,20 @@ void MainWindow::createGrantReadAccessDialog()
         return;
     }
     delete dialog;
-    dialog = new TextModifyDialog("Grant rights for selected columns to user:", this);
-    dialog->show();
-    connect((TextModifyDialog*)dialog, SIGNAL(dataChecked(QString)),
+    dialog = new GrantRightsDialog(this);
+    connect(DBcon, SIGNAL(usersLoaded(QList<QString>)),
+            ((GrantRightsDialog*)dialog), SLOT(loadUsers(QList<QString>)));
+    if (DBcon->loadUsers() > 0)
+        dialog->show();
+    else
+    {
+        CreateErrorDialog("No users available");
+        return;
+    }
+    connect(((GrantRightsDialog*)dialog), SIGNAL(grantRights(QString)),
             DBcon, SLOT(grantReadAccess(QString)));
+    connect(DBcon, SIGNAL(rightsGranted()),
+            dialog, SLOT(close()));
 }
 
 void MainWindow::createGrantWriteAccessDialog()
@@ -717,9 +740,17 @@ void MainWindow::createGrantWriteAccessDialog()
         return;
     }
     delete dialog;
-    dialog = new TextModifyDialog("Grant rights for selected columns to user:", this);
-    dialog->show();
-    connect((TextModifyDialog*)dialog, SIGNAL(dataChecked(QString)),
+    dialog = new GrantRightsDialog(this);
+    connect(DBcon, SIGNAL(usersLoaded(QList<QString>)),
+            ((GrantRightsDialog*)dialog), SLOT(loadUsers(QList<QString>)));
+    if (DBcon->loadUsers() > 0)
+        dialog->show();
+    else
+    {
+        CreateErrorDialog("No users available");
+        return;
+    }
+    connect(((GrantRightsDialog*)dialog), SIGNAL(grantRights(QString)),
             this, SLOT(grantWriteAccess(QString)));
 }
 
@@ -752,12 +783,16 @@ void MainWindow::createImportDataDialog()
     delete dialog;
     dialog = new ImportDataDialog(this);
     connect((ImportDataDialog*)dialog,
-            SIGNAL(getDataSignal(int,QString,QString)),
-            DBcon, SLOT(getGivenData(int,QString,QString)));
-    connect(DBcon, SIGNAL(givenDataLoaded(QStringList)),
+            SIGNAL(getDataSignal(QString)),
+            DBcon, SLOT(getData(QString)));
+    connect(DBcon, SIGNAL(setSpreadsheetSize(int,int)),
+            ((ImportDataDialog*)dialog)->getSpreadsheet(), 
+            SLOT(setSize(int,int)));
+    connect(DBcon, SIGNAL(givenDataLoaded(QMap<int,QString>)),
             ((ImportDataDialog*)dialog)->getSpreadsheet(),
-            SLOT(loadData(QStringList)));
-
+            SLOT(loadData(QMap<int,QString>)));
+    connect(((ImportDataDialog*)dialog), SIGNAL(link(QString)),
+            Spreadsheet, SLOT(setFormula(QString)));
     ((TableDialog*)dialog)->
             loadTreeData(DBcon->getTables(), DBcon->getFolders());
     dialog->show();
@@ -794,12 +829,19 @@ void MainWindow::createLoginDialog()
     dialog->show();
     connect((UserLoginDialog*)dialog, SIGNAL(dataChecked(QString,QString)),
             DBcon, SLOT(login(QString,QString)));
-    /*
-    connect((UserLoginDialog*)dialog,
-            SIGNAL(saveLoginDataSignal(QString, bool, QString)),
-            config,
-            SLOT(setLoginData(QString, bool, QString)));*/
     connect(DBcon, SIGNAL(loggedIn(int)), this, SLOT(logIn(int)));
+}
+
+void MainWindow::createDBLoginDialog()
+{
+    delete dialog;
+    dialog = new UserLoginDialog(this);
+    dialog->setWindowTitle("Database login");
+    dialog->show();
+    connect((UserLoginDialog*)dialog, SIGNAL(dataChecked(QString,QString)),
+            DBcon, SLOT(connectDB(QString,QString)));
+    connect(DBcon, SIGNAL(connected()),
+            this, SLOT(createLoginDialog()));
 }
 
 void MainWindow::createSignInDialog()
@@ -809,7 +851,7 @@ void MainWindow::createSignInDialog()
     dialog->show();
     connect((UserSignInDialog*)dialog, SIGNAL(dataChecked(QString,QString)),
             DBcon, SLOT(createUser(QString,QString)));
-    connect(DBcon, SIGNAL(userCreated()), dialog, SLOT(hide()));
+    connect(DBcon, SIGNAL(userCreated()), dialog, SLOT(close()));
     connect(DBcon, SIGNAL(userCreated()), this, SLOT(createLoginDialog()));
 }
 
@@ -820,12 +862,10 @@ void MainWindow::resizeWindow(int cells)
         this->setMinimumWidth(size);
 }
 
-void MainWindow::initializeDatabase()
+void MainWindow::initializeDatabase(const QString &err)
 {
-    int ok = QMessageBox::question(this, "Initialization",
-                                   "Database not found\n"
-                                   "Do you want to create a new database\n"
-                                   "using the name from configuration ?",
+    QString msg = err+"\nIf database does not exist, create a new one?";
+    int ok = QMessageBox::question(this, "Initialization", msg,
                                    QMessageBox::Yes, QMessageBox::No);
     if (ok == QMessageBox::Yes)
         DBcon->initializeDatabase();

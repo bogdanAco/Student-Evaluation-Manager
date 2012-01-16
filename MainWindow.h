@@ -66,12 +66,13 @@ private:
     QAction *setHeaderTextAction;
     QAction *resetHeaderTextAction;
     
+    //Formula action
+    QList <QAction*> formulaActions;
+    QAction *formulaAction;
     QPushButton *fontColorButton,
                 *backgroundColorButton,
                 *fontButton;
     QPixmap *colorPixmap;
-    //Formula action
-    QAction *formulaAction;
     //Application actions
     QList <QAction*> appActions;
     QAction *configureAction;
@@ -115,9 +116,10 @@ private slots:
     void createImportDataDialog();
     void createFormulaDialog();
     void createLoginDialog();
+    void createDBLoginDialog();
     void createSignInDialog();
     void resizeWindow(int cells);
-    void initializeDatabase();
+    void initializeDatabase(const QString &err);
     void displayError(const QString &message);
     void clearErrorMessage();
     void displayCurrentCellSettings(const QFont &font, 

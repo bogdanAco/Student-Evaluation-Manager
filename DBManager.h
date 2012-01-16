@@ -16,14 +16,15 @@ public:
     void removeCurrentData();
 
     void initializeDatabase();
-    bool connectDB(const QString& uname, const QString& pass);
     bool writeData(int line, int column, const QString& cell_data);
     int columnCount();
+    int loadUsers();
     QHash<QString, QString> getTables();
     QHash<QString, QString> getFolders();
     ~DBManager();
 
 signals:
+    void connected();
     void queryError(const QString &error);
     void rightsLoaded(const QList<int> columns);
     void rowsHeightLoaded(const QMap<int,int> size);
@@ -31,7 +32,7 @@ signals:
     void columnsHeaderTextLoaded(const QMap<int, QString> data);
     void dataLoaded(const QMap<int, QString> &data);
     void dataLoaded(int row, int column, const QString &data);
-    void givenDataLoaded(const QStringList &data);
+    void givenDataLoaded(const QMap<int, QString> &data);
     void tableCreated(const QString &data, int columns, int rows);
     void tableOpened(const QString &name, int columns, int rows);
     void loggedIn(int uid);
@@ -42,8 +43,11 @@ signals:
     void dataModified(const QHash<QString, QString> &tables,
                       const QHash<QString, QString> &folders);
     void message(const QString &msg);
-    void initializeDatabaseRequest();
+    void initializeDatabaseRequest(const QString &error);
     void closeCurrentTable();
+    void usersLoaded(QList<QString> users);
+    void rightsGranted();
+    void setSpreadsheetSize(int rows, int columns);
 
 private:
     int current_user_id;
@@ -58,11 +62,12 @@ private:
     void deleteTable(int id);
 
 public slots:
+    void connectDB(const QString& uname, const QString& pass);
+    
     void getData();
     void getData(const QString &table, int row, int column,
                  int destRow, int destCol);
-    void getGivenData(int field, const QString &fieldVal,
-                      const QString &table);
+    void getData(const QString &table);
     void createTable(const QString &name, int columns,
                     int rows, const QString &folder);
     void openTable(const QString &name, int columns,

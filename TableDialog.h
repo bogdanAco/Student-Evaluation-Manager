@@ -100,13 +100,11 @@ public slots:
 
 private:
     SpreadSheet *table;
-    QLineEdit *searchValue;
-    QPushButton *search;
-    QLineEdit *columnNo;
+    QPushButton *load;
 
 signals:
-    void getDataSignal(int field, const QString &fieldVal,
-                       const QString &table);
+    void getDataSignal(const QString &table);
+    void link(const QString &link);
 };
 
 #endif // TABLEDIALOG_H

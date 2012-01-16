@@ -27,8 +27,6 @@ ConfigurationDialog::~ConfigurationDialog()
     delete dbServer;
     delete dbPort;
     delete dbName;
-    delete dbUser;
-    delete dbPass;
     delete dbRmFolderContent;
     delete dbBackupTables;
     delete databaseLayout;
@@ -95,19 +93,6 @@ void ConfigurationDialog::createDatabaseTab()
     databaseLayout->addWidget(dbName);
     connect(dbName, SIGNAL(textChanged(QString)),
             cfg, SLOT(setDBName(QString)));
-
-    databaseLayout->addWidget(new QLabel("Username:"));
-    dbUser = new QLineEdit(cfg->getDBUser());
-    databaseLayout->addWidget(dbUser);
-    connect(dbUser, SIGNAL(textChanged(QString)),
-            cfg, SLOT(setDBUser(QString)));
-
-    databaseLayout->addWidget(new QLabel("Password:"));
-    dbPass = new QLineEdit(cfg->getDBPassword());
-    dbPass->setEchoMode(QLineEdit::Password);
-    databaseLayout->addWidget(dbPass);
-    connect(dbPass, SIGNAL(textChanged(QString)),
-            cfg, SLOT(setDBPassword(QString)));
 
     dbRmFolderContent = new QCheckBox("Remove contained tables "
                                                  "when removing folder");
@@ -225,7 +210,7 @@ void ConfigurationDialog::prepareKeysGeneration()
     connect(d, SIGNAL(saveLoginDataSignal(QString,QString)),
             this, SLOT(generateKeys(QString,QString)));
     connect(d, SIGNAL(saveLoginDataSignal(QString,QString)),
-            d, SLOT(hide()));
+            d, SLOT(close()));
 }
 
 void ConfigurationDialog::generateKeys(const QString &name, const QString &pass)

@@ -80,6 +80,25 @@ private:
     virtual void checkData();
 };
 
+class GrantRightsDialog : public Dialog
+{
+    Q_OBJECT
+public:
+    GrantRightsDialog(QWidget *parent = 0);
+    
+public slots:
+    void loadUsers(QList<QString> users);
+    
+private slots:
+    void grantRights();
+    
+signals:
+    void grantRights(const QString &username);
+    
+private:
+    QComboBox *user;
+};
+
 class UserLoginDialog : public Dialog
 {
     Q_OBJECT
@@ -127,7 +146,6 @@ class ErrorDialog : public Dialog
     Q_OBJECT
 public:
     ErrorDialog(const QString& text, QWidget* parent = 0);
-    ~ErrorDialog();
 };
 
 class FormulaDialog : public Dialog

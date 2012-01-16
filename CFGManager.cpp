@@ -23,13 +23,7 @@ CFGManager::CFGManager()
                 database.appendChild(dbPort);
                 QDomElement dbName = domDoc->createElement("name");
                 dbName.appendChild(domDoc->createTextNode("studMng"));
-                database.appendChild(dbName);
-                QDomElement dbUser = domDoc->createElement("user");
-                dbUser.appendChild(domDoc->createTextNode("root"));
-                database.appendChild(dbUser);
-                QDomElement dbPass = domDoc->createElement("password");
-                dbPass.appendChild(domDoc->createTextNode(" "));
-                database.appendChild(dbPass);       
+                database.appendChild(dbName);       
         saveDoc();
     }
     else
@@ -72,19 +66,6 @@ QString CFGManager::getDBName() const
 {
     return root->firstChildElement("database").
             firstChildElement("name").text();
-}
-
-QString CFGManager::getDBUser() const
-{
-    return root->firstChildElement("database").
-            firstChildElement("user").text();
-}
-
-QString CFGManager::getDBPassword() const
-{
-    QString aux = root->firstChildElement("database").
-                  firstChildElement("password").text();
-    return (aux != " ")?aux:"";
 }
 
 bool CFGManager::removeChildren() const
@@ -255,7 +236,7 @@ void CFGManager::setCurrentUser(const QString &name) const
             QDomElement spreadsheet = domDoc->createElement("spreadsheet");
             currentUser->appendChild(spreadsheet);
                 QDomElement rows = domDoc->createElement("rows");
-                rows.appendChild(domDoc->createTextNode("600"));
+                rows.appendChild(domDoc->createTextNode("100"));
                 spreadsheet.appendChild(rows);
                 QDomElement columns = domDoc->createElement("columns");
                 columns.appendChild(domDoc->createTextNode("6"));
@@ -348,23 +329,6 @@ void CFGManager::setDBName(const QString &name)
                             firstChildElement("name"));
     currentValue.removeChild(currentValue.firstChild());
     currentValue.appendChild(domDoc->createTextNode(name));
-}
-
-void CFGManager::setDBUser(const QString &user)
-{
-    QDomElement currentValue(root->firstChildElement("database").
-                            firstChildElement("user"));
-    currentValue.removeChild(currentValue.firstChild());
-    currentValue.appendChild(domDoc->createTextNode(user));
-}
-
-void CFGManager::setDBPassword(const QString &pass)
-{
-    QString aux = (pass == "")?" ":pass;
-    QDomElement currentValue(root->firstChildElement("database").
-                            firstChildElement("password"));
-    currentValue.removeChild(currentValue.firstChild());
-    currentValue.appendChild(domDoc->createTextNode(aux));
 }
 
 void CFGManager::setRemoveChildren(bool remove)

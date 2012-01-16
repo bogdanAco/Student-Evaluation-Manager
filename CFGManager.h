@@ -15,8 +15,6 @@ public:
     QString getDBServer() const;
     int getDBPort() const;
     QString getDBName() const;
-    QString getDBUser() const;
-    QString getDBPassword() const;
     bool removeChildren() const;
     bool backupTables() const;
     int getBackupExpireDate() const;
@@ -47,8 +45,6 @@ public slots:
     void setDBServer(const QString &server);
     void setDBPort(int port);
     void setDBName(const QString &name);
-    void setDBUser(const QString &user);
-    void setDBPassword(const QString &pass);
     void setRemoveChildren(bool remove);
     void setBackupTables(bool backup);
     void setBackupExpireDate(int afterNDays);

@@ -8,7 +8,7 @@ class SpreadSheet : public QTableWidget
 {
     Q_OBJECT
 public:
-    SpreadSheet(int rows = 600, int columns = 6, QWidget *parent = 0);
+    SpreadSheet(int rows = 100, int columns = 6, QWidget *parent = 0);
     ~SpreadSheet();
 
     bool printSpreadSheet(const QString &fileName) const;
@@ -24,7 +24,6 @@ public:
     int timestampCount() const;
     QString getTimestamp(int index) const;
     void setCellsSize(const QSize &size);
-    void setFormula(const QString &formula);
     QList<int> selectedColumns();
     QString headerText(int column);
     void setHeaderText(int column, const QString &text);
@@ -51,6 +50,7 @@ signals:
                                  const QBrush &foreground);
 
 public slots:
+    void setFormula(const QString &formula);
     void setFormula(int row, int column, const QString &formula);
     void cut();
     void copy();
@@ -69,6 +69,7 @@ public slots:
     void addRows(int rows);
     void removeColumns(const QList <int> column_ids);
     void setRights(const QList<int> columns);
+    void setSize(int rows, int columns);
 
 private slots:
     void somethingChanged(QTableWidgetItem *cell);

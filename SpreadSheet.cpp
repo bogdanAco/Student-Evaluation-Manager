@@ -2,7 +2,7 @@
 
 SpreadSheet::SpreadSheet(int rows, int columns, QWidget *parent) : QTableWidget(parent)
 {
-    (rows < 1)?setRowCount(600):setRowCount(rows);
+    (rows < 1)?setRowCount(100):setRowCount(rows);
     (columns < 1)?setColumnCount(6):setColumnCount(columns);
 
     setItemPrototype(new Cell());
@@ -599,6 +599,15 @@ void SpreadSheet::setRights(const QList<int> columns)
             }
 }
 
+void SpreadSheet::setSize(int rows, int columns)
+{
+    if (rows == 0 || columns == 0)
+        return;
+        
+    setRowCount(rows);
+    setColumnCount(columns);
+}
+
 void SpreadSheet::somethingChanged(QTableWidgetItem *cell)
 {
     if (cell == 0)
@@ -648,7 +657,7 @@ void SpreadSheet::loadData(const QMap<int, QString> &data)
 void SpreadSheet::emitGetLink(const QString &table, int r,
                  int c, const QTableWidgetItem* cell)
 {
-    emit getLink(table, r, c, column(cell), row(cell));
+    emit getLink(table, r, c, row(cell), column(cell));
 }
 
 void SpreadSheet::currentSelectionChanged()

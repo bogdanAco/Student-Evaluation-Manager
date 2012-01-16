@@ -25,8 +25,6 @@ private:
     QLineEdit *dbServer;
     QSpinBox *dbPort;
     QLineEdit *dbName;
-    QLineEdit *dbUser;
-    QLineEdit *dbPass;
     QCheckBox *dbRmFolderContent;
     QCheckBox *dbBackupTables;
     QSpinBox *dbRemoveBackup;

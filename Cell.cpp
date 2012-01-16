@@ -334,8 +334,8 @@ QVariant Cell::parseMember(const QString &formula, const QTableWidget *widget) c
                 }
             }
         }
-        // link("Table name";row;column)
-        // resolved link: link("Table name";row;column;"Value")
+        // link(Table name;row;column)
+        // resolved link: link(Table name;row;column;Value)
         else if (s == "link")
         {
             if (parameters.length() == 4)

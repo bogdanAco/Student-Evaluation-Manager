@@ -29,7 +29,7 @@ Dialog::Dialog(const QString &title, const QString &text, QWidget* parent) :
 
 Dialog::~Dialog()
 {
-    this->hide();
+    this->close();
     delete text;
     delete result;
     delete ok;
@@ -65,7 +65,7 @@ CreateFolderDialog::~CreateFolderDialog()
 
 void CreateFolderDialog::emitSelected()
 {
-    this->hide();
+    this->close();
     emit selected(value->text());
 }
 
@@ -96,7 +96,7 @@ void ModifyDialog::checkData()
         result->setText("Number must be between 1-10");
         return;
     }
-    this->hide();
+    this->close();
     emit dataChecked(count);
 }
 
@@ -115,8 +115,28 @@ void TextModifyDialog::checkData()
         result->setText("No text entered");
         return;
     }
-    this->hide();
+    this->close();
     emit dataChecked(value->text());
+}
+
+GrantRightsDialog::GrantRightsDialog(QWidget *parent) :
+    Dialog("Grant rights", "Username", parent)
+{
+    user = new QComboBox();
+    mainLayout->addWidget(user, 5, 0, 1, 4);
+    connect(this, SIGNAL(okPressed()), this, SLOT(grantRights()));
+}
+
+void GrantRightsDialog::loadUsers(QList<QString> users)
+{
+    QListIterator<QString> it(users);
+    while (it.hasNext())
+        user->addItem(it.next());   
+}
+
+void GrantRightsDialog::grantRights()
+{
+    emit grantRights(user->currentText());
 }
 
 UserLoginDialog::UserLoginDialog(QWidget *parent) :
@@ -129,10 +149,9 @@ UserLoginDialog::UserLoginDialog(QWidget *parent) :
     passwd = new QLineEdit(this);
     passwd->setEchoMode(QLineEdit::Password);
     mainLayout->addWidget(passwd, 6, 0, 1, 4);
+    usrnm->setFocus();
 
     connect(this, SIGNAL(okPressed()), this, SLOT(checkData()));
-    connect(this, SIGNAL(dataChecked(QString,QString)),
-            this, SIGNAL(saveLoginDataSignal(QString,QString)));
 }
 
 void UserLoginDialog::showMessage(const QString &msg)
@@ -144,15 +163,9 @@ void UserLoginDialog::checkData()
 {
     result->setText("");
     int name_len = usrnm->text().length();
-    int pass_len = passwd->text().length();
     if (name_len == 0)
     {
         result->setText("No username entered");
-        return;
-    }
-    else if (pass_len == 0)
-    {
-        result->setText("No password entered");
         return;
     }
     emit dataChecked(usrnm->text(), passwd->text());
@@ -160,7 +173,7 @@ void UserLoginDialog::checkData()
 
 UserLoginDialog::~UserLoginDialog()
 {
-    this->hide();
+    this->close();
     delete usrnm;
     delete password;
     delete passwd;
@@ -247,11 +260,6 @@ ErrorDialog::ErrorDialog(const QString& text, QWidget* parent) :
 {
     cancel->hide();
     connect(ok, SIGNAL(clicked()), this, SLOT(close()));
-}
-
-ErrorDialog::~ErrorDialog()
-{
-
 }
 
 FormulaDialog::FormulaDialog(int currentRow, int currentCol,
