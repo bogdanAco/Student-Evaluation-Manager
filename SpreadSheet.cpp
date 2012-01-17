@@ -334,7 +334,8 @@ void SpreadSheet::clear()
         QTableWidgetItem *item = horizontalHeaderItem(i);
         if (!item)
             item = new QTableWidgetItem();
-        item->setText(QString(QChar('A' + i)));
+        QString hText = item->text();
+        item->setText(hText.replace(0, 1, QString(QChar('A' + i))));
         this->setHorizontalHeaderItem(i, item);
     }
 

@@ -537,7 +537,6 @@ void DBManager::getData()
         headers_text.insert(query->value(0).toInt(),
                             query->value(2).toString());
     }
-
     emit columnsWidthLoaded(columns_width);
     emit rowsHeightLoaded(rows_height);
     emit columnsHeaderTextLoaded(headers_text);
@@ -545,7 +544,7 @@ void DBManager::getData()
     emit dataLoaded(current_data);
 }
 
-//TO BE TESTED
+//OK, TESTED, WORKING
 void DBManager::getData(const QString &table, int row, int column,
                         int destRow, int destCol)
 {
