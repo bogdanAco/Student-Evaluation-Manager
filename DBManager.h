@@ -3,9 +3,10 @@
 
 #include <QtCore>
 #include <QtSql>
-#include "SpreadSheet.h"
 #include "Security.h"
 #include "CFGManager.h"
+
+class SpreadSheet;
 
 class DBManager : public QObject
 {
@@ -15,17 +16,18 @@ public:
     void setCurrentSpreadSheet(SpreadSheet *spreadsheet);
     void removeCurrentData();
 
-    void initializeDatabase();
+    void initializeDatabase(const QString &username, 
+                            const QString &password);
     bool writeData(int line, int column, const QString& cell_data);
     int columnCount();
     int loadUsers();
     QHash<QString, QString> getTables();
     QHash<QString, QString> getFolders();
     ~DBManager();
-
+    void disconnectDB();
+    
 signals:
-    void connected();
-    void queryError(const QString &error);
+    void queryError(const QString &error) const;
     void rightsLoaded(const QList<int> columns);
     void rowsHeightLoaded(const QMap<int,int> size);
     void columnsWidthLoaded(const QMap<int,int> size);
@@ -43,7 +45,9 @@ signals:
     void dataModified(const QHash<QString, QString> &tables,
                       const QHash<QString, QString> &folders);
     void message(const QString &msg);
-    void initializeDatabaseRequest(const QString &error);
+    void initializeDatabaseRequest(const QString &username, 
+                                   const QString &password,
+                                   const QString &error);
     void closeCurrentTable();
     void usersLoaded(QList<QString> users);
     void rightsGranted();
@@ -60,21 +64,20 @@ private:
     const CFGManager *cfg;
     
     void deleteTable(int id);
+    
+    void login(const QString& uname, const QString& pass);
+    void createUser(const QString &uname, const QString &pass);
 
 public slots:
     void connectDB(const QString& uname, const QString& pass);
     
     void getData();
-    void getData(const QString &table, int row, int column,
-                 int destRow, int destCol);
+    QHash<QString,QString> getLinkData(const QHash<QString,QString> &matches) const;
     void getData(const QString &table);
     void createTable(const QString &name, int columns,
                     int rows, const QString &folder);
     void openTable(const QString &name, int columns,
                   int rows, const QString &folder);
-
-    void login(const QString& uname, const QString& pass);
-    void createUser(const QString &uname, const QString &pass);
 
     void grantReadAccess(const QString &username);
     void grantWriteAccess(const QString &username, const QList<int> columns);
@@ -87,8 +90,8 @@ public slots:
     void setRowHeight(int row, int oldSize, int newSize);
 
     void createFolder(const QString &name, const QString &parent);
-    void removeFolder(const QString &name);
-    void removeTable(const QString& name);
+    bool removeFolder(const QString &name);
+    bool removeTable(const QString& name);
 
     void changeKey(const QString &oldPrivateKey,
                    const QString &publicKey,

@@ -5,7 +5,7 @@ ConfigurationDialog::ConfigurationDialog(const CFGManager *cfg, QWidget *parent)
         Dialog("Configuration", "", parent)
 {
     this->cfg = cfg;
-    setFixedSize(300, 480);
+    setFixedSize(350, 500);
     text->hide();
     connect(cfg, SIGNAL(errorMessage(QString)),
             this, SLOT(showMessage(QString)));
@@ -94,8 +94,8 @@ void ConfigurationDialog::createDatabaseTab()
     connect(dbName, SIGNAL(textChanged(QString)),
             cfg, SLOT(setDBName(QString)));
 
-    dbRmFolderContent = new QCheckBox("Remove contained tables "
-                                                 "when removing folder");
+    dbRmFolderContent = new QCheckBox("Remove the contained tables "
+                                      "and subfolders\nwhen removing a folder");
     dbRmFolderContent->setChecked(cfg->removeChildren());
     databaseLayout->addWidget(dbRmFolderContent);
     connect(dbRmFolderContent, SIGNAL(toggled(bool)),
@@ -207,9 +207,9 @@ void ConfigurationDialog::prepareKeysGeneration()
     UserLoginDialog *d = new UserLoginDialog(this);
     d->show();
     d->setWindowTitle("Passphrase generation");
-    connect(d, SIGNAL(saveLoginDataSignal(QString,QString)),
+    connect(d, SIGNAL(dataChecked(QString,QString)),
             this, SLOT(generateKeys(QString,QString)));
-    connect(d, SIGNAL(saveLoginDataSignal(QString,QString)),
+    connect(d, SIGNAL(dataChecked(QString,QString)),
             d, SLOT(close()));
 }
 

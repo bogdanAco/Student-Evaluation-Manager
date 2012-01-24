@@ -3,6 +3,7 @@
 
 #include <QtCore>
 #include <QtGui>
+#include "SpreadSheet.h"
 
 class Cell : public QObject, public QTableWidgetItem
 {
@@ -13,27 +14,22 @@ public:
 
     QVariant data(int role) const;
     void setData(int role, const QVariant &value);
-    QVariant display() const;
-
-    inline QString formula() const
-         { return QTableWidgetItem::data(Qt::DisplayRole).toString(); }
+    QVariant display(const QString &data = QString()) const;
+    QString formula() const;
     QVariant computeFormula(const QString &formula,
-                            const QTableWidget *widget) const;
+                            SpreadSheet *widget) const;
 private:
     bool isValidFormula(const QString &formula) const;
     QVariant parseMember(const QString &formula,
-                         const QTableWidget *widget) const;
+                         SpreadSheet *widget) const;
     QString compareMembers(int &param_no, const QString &op,
                         double &firstOperand, double &secondOperand,
                         const QString &case1, const QString &case2) const;
     bool compareMembers(const QString &op, double &firstOperand, double &secondOperand) const;
-    QVariant getCellValue(const QString &id,
-                  const QTableWidget *widget) const;
+    QVariant getCellValue(const QString &id, SpreadSheet *widget) const;
     int firstOperatorPosition(const QString &formula) const;
 
 signals:
-    void getLink(const QString &table, int row,
-                 int column, const QTableWidgetItem* cell) const;
     void invalidFormula(const QString &message) const;
 };
 

@@ -115,8 +115,6 @@ protected:
 signals:
     void dataChecked(const QString &name,
                      const QString &password);
-    void saveLoginDataSignal(const QString &name,
-                             const QString &password);
 protected slots:
     virtual void checkData();
 };
@@ -152,7 +150,7 @@ class FormulaDialog : public Dialog
 {
     Q_OBJECT
 public:
-    FormulaDialog(int currentRow, int currentCol,
+    FormulaDialog(const QMultiMap<int,int> &selection, 
                   const SpreadSheet *spreadsheet,
                   QWidget *parent = 0);
     ~FormulaDialog();
@@ -170,8 +168,7 @@ private:
     QLabel *elseText;
     QLineEdit *elseValue;
     const SpreadSheet *spreadsheet;
-    int currentRow;
-    int currentColumn;
+    QMultiMap<int,int> selection;
     void hideThenElse();
     void showThenElse();
 
@@ -181,8 +178,9 @@ private slots:
     void generateFormula();
 
 signals:
-    void setFormula(int row, int col,
-                    const QString &formula);
+    void setSelectedItems(const QMultiMap<int,int> &items);
+    void setFormula(const QString &formula, 
+                    const QMultiMap<int,int> &selection);
 };
 
 #endif // DIALOG_H

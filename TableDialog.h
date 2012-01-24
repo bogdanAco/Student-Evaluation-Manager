@@ -59,6 +59,9 @@ protected:
     bool isTable(TreeItem *item);
     bool isFolder(const QString &nodeName);
     bool isTable(const QString &nodeName);
+    void loadItemsByParent(QTreeWidgetItem *parent,
+                             const QHash<QString,QString> &tables, 
+                             const QHash<QString,QString> &folders);
 };
 
 class OpenTableDialog : public TableDialog
@@ -90,21 +93,28 @@ class ImportDataDialog : public TableDialog
 {
     Q_OBJECT
 public:
-    ImportDataDialog(QWidget *parent = 0);
+    ImportDataDialog(const QMultiMap<int,int> &currentSelection, 
+                     QWidget *parent = 0);
     SpreadSheet *getSpreadsheet() const;
     ~ImportDataDialog();
 
 public slots:
     void checkValidity();
     void getData();
+    void setRights();
+    void setSelectedItems(const QMultiMap<int,int> &items);
 
 private:
     SpreadSheet *table;
     QPushButton *load;
+    QMultiMap<int,int> selection;
+    QString table_name;
 
 signals:
     void getDataSignal(const QString &table);
-    void link(const QString &link);
+    void link(const QString &table, 
+              const QMultiMap<int,int> &from, 
+              const QMultiMap<int,int> &to);
 };
 
 #endif // TABLEDIALOG_H

@@ -29,7 +29,8 @@ Dialog::Dialog(const QString &title, const QString &text, QWidget* parent) :
 
 Dialog::~Dialog()
 {
-    this->close();
+    disconnect();
+    close();
     delete text;
     delete result;
     delete ok;
@@ -65,8 +66,9 @@ CreateFolderDialog::~CreateFolderDialog()
 
 void CreateFolderDialog::emitSelected()
 {
-    this->close();
     emit selected(value->text());
+    disconnect();
+    close();
 }
 
 ModifyDialog::ModifyDialog(const QString &type, QWidget *parent) :
@@ -96,8 +98,9 @@ void ModifyDialog::checkData()
         result->setText("Number must be between 1-10");
         return;
     }
-    this->close();
     emit dataChecked(count);
+    disconnect();
+    close();
 }
 
 TextModifyDialog::TextModifyDialog(const QString &type, QWidget *parent) :
@@ -115,8 +118,9 @@ void TextModifyDialog::checkData()
         result->setText("No text entered");
         return;
     }
-    this->close();
     emit dataChecked(value->text());
+    disconnect();
+    close();
 }
 
 GrantRightsDialog::GrantRightsDialog(QWidget *parent) :
@@ -142,11 +146,11 @@ void GrantRightsDialog::grantRights()
 UserLoginDialog::UserLoginDialog(QWidget *parent) :
         Dialog("User login", "Username", parent)
 {
-    usrnm = new QLineEdit(this);
+    usrnm = new QLineEdit("bau", this);
     mainLayout->addWidget(usrnm, 4, 0, 1, 4);
     password = new QLabel("Password:",this);
     mainLayout->addWidget(password, 5, 0, 1, 4);
-    passwd = new QLineEdit(this);
+    passwd = new QLineEdit("Rainbow0745@", this);
     passwd->setEchoMode(QLineEdit::Password);
     mainLayout->addWidget(passwd, 6, 0, 1, 4);
     usrnm->setFocus();
@@ -173,7 +177,7 @@ void UserLoginDialog::checkData()
 
 UserLoginDialog::~UserLoginDialog()
 {
-    this->close();
+    close();
     delete usrnm;
     delete password;
     delete passwd;
@@ -262,16 +266,14 @@ ErrorDialog::ErrorDialog(const QString& text, QWidget* parent) :
     connect(ok, SIGNAL(clicked()), this, SLOT(close()));
 }
 
-FormulaDialog::FormulaDialog(int currentRow, int currentCol,
-                             const SpreadSheet *spreadsheet,
-                             QWidget *parent) :
+FormulaDialog::FormulaDialog(const QMultiMap<int, int> &selection, 
+                             const SpreadSheet *spreadsheet, QWidget *parent) :
         Dialog("Formula", "Select a function", parent)
 {
     this->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     this->setFixedSize(220, 280);
     this->spreadsheet = spreadsheet;
-    this->currentRow = currentRow;
-    this->currentColumn = currentCol;
+    this->selection = selection;
 
     mainLayout->removeWidget(text);
     mainLayout->addWidget(text, 0, 0, 1, 4);
@@ -322,9 +324,11 @@ FormulaDialog::FormulaDialog(int currentRow, int currentCol,
             this, SLOT(showFormulaInfo(QString)));
     connect(this->spreadsheet, SIGNAL(itemSelectionChanged()),
             this, SLOT(addRangeItems()));
+    connect(this, SIGNAL(setSelectedItems(QMultiMap<int,int>)),
+            this->spreadsheet, SLOT(setSelectedItemIndexes(QMultiMap<int,int>)));
     connect(this, SIGNAL(okPressed()), this, SLOT(generateFormula()));
-    connect(this, SIGNAL(accepted()), spreadsheet, SLOT(clearSelection()));
-    connect(this, SIGNAL(cancelPressed()), spreadsheet, SLOT(clearSelection()));
+    connect(this, SIGNAL(setFormula(QString,QMultiMap<int,int>)),
+            this, SLOT(close()));
 }
 
 FormulaDialog::~FormulaDialog()
@@ -412,30 +416,42 @@ void FormulaDialog::addRangeItems()
 {
     if (formula->currentText() == "if")
     {
-        QString condition = range->text().remove(QRegExp("^([A-Z][0-9]{1,3})"));
+        QString condition = range->text().remove(QRegExp("^([A-Z][1-9][0-9]*)"));
         range->setText(spreadsheet->currentLocation().append(condition));
         return;
     }
 
     range->setText("");
-    QTableWidgetSelectionRange selected = spreadsheet->selectedRange();
-    for (int i=selected.topRow(); i<=selected.bottomRow(); i++)
-        for (int j=selected.leftColumn(); j<=selected.rightColumn(); j++)
-            range->setText(range->text().
-                           append(spreadsheet->getLocation(i, j)).
-                           append(";"));
+    QMultiMap<int,int> selected = spreadsheet->selectedItemIndexes();
+    QMapIterator<int,int> it(selected);
+    while (it.hasNext())
+    {
+        it.next();
+        range->setText(range->text().
+                       append(spreadsheet->getLocation(it.key(), it.value())).
+                       append(";"));
+    }
     range->setText(range->text().remove(range->text().length()-1, 1));
 }
 
 void FormulaDialog::generateFormula()
 {
     if (formula->currentText() == "")
+    {
+        showMessage("No formula selected");
         return;
-    if (condition->isEnabled())
+    }
+    if (condition->isVisible())
         if (condition->text() == "")
+        {
+            showMessage("No condition entered");
             return;
+        }
     if (range->text() == "")
+    {
+        showMessage("No items selected");
         return;
+    }
 
     QString finalFormula = "=";
     finalFormula.append(formula->currentText());
@@ -462,5 +478,6 @@ void FormulaDialog::generateFormula()
         }
     }
     finalFormula.append(")");
-    emit setFormula(currentRow, currentColumn, finalFormula);
+    emit setSelectedItems(selection);
+    emit setFormula(finalFormula, selection);
 }

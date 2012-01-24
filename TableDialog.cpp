@@ -47,56 +47,8 @@ void TableDialog::loadTreeData(const QHash<QString, QString> &tables,
     for (int i=items.length()-1; i>=0; i--)
         delete items.at(i);
     
-    QHashIterator<QString, QString> foldersIt(folders);
-    while (foldersIt.hasNext())
-    {
-        foldersIt.next();
-        QString folderName = foldersIt.key();
-        QString parentName = foldersIt.value();
-        
-        TreeItem *item = 0;
-        if (parentName == "")
-            item = new TreeItem(TreeItem::Folder, root);
-        else
-        {
-            QList<QTreeWidgetItem*> parentNodes = treeView->findItems(parentName,
-                                                              Qt::MatchExactly |
-                                                              Qt::MatchRecursive);
-            if (parentNodes.length() <= 0)
-                continue;
-            item = new TreeItem(TreeItem::Folder, parentNodes.at(0));
-        }
-        if (!item)
-            continue;
-        item->setText(0, folderName);
-        item->setExpanded(true);
-    }
+    loadItemsByParent(root, tables, folders);
     
-    QHashIterator<QString, QString> tablesIt(tables);
-    while (tablesIt.hasNext())
-    {
-        tablesIt.next();
-        QString tableName = tablesIt.key();
-        QString parentName = tablesIt.value();
-        
-        TreeItem *item = 0;
-        if (parentName == "Root")
-            item = new TreeItem(TreeItem::Table, root);
-        else
-        {
-            QList<QTreeWidgetItem*> parentNodes = treeView->findItems(parentName,
-                                                              Qt::MatchExactly |
-                                                              Qt::MatchRecursive);
-            if (parentNodes.length() <= 0)
-                continue;
-            for (int n=0; n<parentNodes.length(); n++)
-                if (((TreeItem*)parentNodes.at(n))->getType() == TreeItem::Folder)
-                    item =  new TreeItem(TreeItem::Table, parentNodes.at(n));
-            if (!item)
-                continue;
-        }
-        item->setText(0, tableName);
-    }
     treeView->sortItems(0, Qt::AscendingOrder);
 }
 
@@ -182,7 +134,7 @@ void TableDialog::createFolder(const QString &name)
         showMessage("Please enter a folder name");
         return;
     }
-    if (treeDataContains(name))
+    if (isFolder(name))
     {
         showMessage("Folder already exist");
         return;
@@ -294,6 +246,35 @@ bool TableDialog::isTable(const QString &nodeName)
     return false;
 }
 
+void TableDialog::loadItemsByParent(QTreeWidgetItem *parent, 
+                                    const QHash<QString, QString> &tables, 
+                                    const QHash<QString, QString> &folders)
+{
+    QString txt = "";
+    if (!parent)
+        return;
+    else if ((txt = parent->text(0)).isEmpty())
+        return;
+    
+    QListIterator<QString> it(folders.keys(txt));
+    while (it.hasNext())
+    {
+        QString folderName = it.next();
+        TreeItem *item = new TreeItem(TreeItem::Folder, parent);
+        item->setText(0, folderName);
+        item->setExpanded(true);
+        loadItemsByParent(item, tables, folders);
+    }
+    
+    QListIterator<QString> filesIt(tables.keys(txt));
+    while (filesIt.hasNext())
+    {
+        QString fileName = filesIt.next();
+        TreeItem *item = new TreeItem(TreeItem::Table, parent);
+        item->setText(0, fileName);
+    }
+}
+
 OpenTableDialog::OpenTableDialog(QWidget *parent) :
         TableDialog("Open table", "Enter table name", parent)
 {
@@ -309,7 +290,7 @@ void OpenTableDialog::checkValidity()
         showMessage("No table name");
         return;
     }
-    if (isFolder(tableName->text()))
+    if (isFolder((TreeItem*)treeView->currentItem()))
     {
         showMessage("No table selected");
         return;
@@ -351,19 +332,24 @@ void NewTableDialog::checkValidity()
         showMessage("No table name");
         return;
     }
-    if (treeView->selectedItems().length() == 0)
+    if (treeView->currentItem() == 0)
     {
         showMessage("No folder selected");
         return;
     }
-    if (isTable((TreeItem*)treeView->selectedItems().at(0)))
+    if (isTable((TreeItem*)treeView->currentItem()))
     {
         showMessage("Invalid folder selected");
         return;
     }
-    if (treeDataContains(tableName->text()))
+    if (isTable(tableName->text()))
     {
         showMessage("Table name already exists");
+        return;
+    }
+    if (tableName->text().contains(QRegExp("(;|:|\\)|\\()")))
+    {
+        showMessage("Table name must not contain ';', ':' or brackets");
         return;
     }
     bool ok;
@@ -384,13 +370,15 @@ void NewTableDialog::checkValidity()
     this->close();
 }
 
-ImportDataDialog::ImportDataDialog(QWidget *parent) :
+ImportDataDialog::ImportDataDialog(const QMultiMap<int, int> &currentSelection, QWidget *parent) :
     TableDialog("Import data", "Enter table name", parent)
 {
-    //setMaximumSize(800, 600);
+    setMinimumSize(800, 600);
     table = new SpreadSheet(1, 1, this);
-    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     mainLayout->addWidget(this->table, 0, 4, 10, 1);
+    selection = currentSelection;
+    table_name = "";
     
     load = new QPushButton("Load data");
     mainLayout->addWidget(load, 9, 0, 1, 3);
@@ -413,23 +401,19 @@ void ImportDataDialog::checkValidity()
 {
     showMessage("");
 
-    if (table->currentItem()->text().isEmpty())
-    {
-        showMessage("No item selected");
-        return;
-    }
-    else if (tableName->text().isEmpty())
+    if (tableName->text().isEmpty())
     {
         showMessage("No document selected");
         return;
     }
-
-    QString formula = QString("=link(%1;%2;%3;%4)").
-            arg(tableName->text()).
-            arg(table->currentRow()).
-            arg(table->currentColumn()).
-            arg(table->currentItem()->data(Qt::DisplayRole).toString());
-    emit link(formula);
+    QMultiMap<int,int> selectedIndexes = table->selectedItemIndexes();
+    if (!SpreadSheet::selectionsEquals(selection, selectedIndexes))
+    {
+        showMessage("Main selection size must be equal to "
+                    "the size of the current selection");
+        return;
+    }
+    emit link(table_name, selectedIndexes, selection);
     this->close();
 }
 
@@ -441,6 +425,17 @@ void ImportDataDialog::getData()
         return;
     }
     showMessage("");
+    table_name = tableName->text();
     emit getDataSignal(tableName->text());
     ok->setEnabled(true);
+}
+
+void ImportDataDialog::setRights()
+{
+    table->setRights(QList<int>());
+}
+
+void ImportDataDialog::setSelectedItems(const QMultiMap<int, int> &items)
+{
+    selection = items;
 }

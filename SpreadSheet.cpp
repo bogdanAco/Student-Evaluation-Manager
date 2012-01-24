@@ -1,13 +1,17 @@
 #include "SpreadSheet.h"
+#include "Cell.h"
 
-SpreadSheet::SpreadSheet(int rows, int columns, QWidget *parent) : QTableWidget(parent)
+SpreadSheet::SpreadSheet(int rows, int columns, QWidget *parent,
+                         const DBManager *const mng) : 
+    QTableWidget(parent)
 {
     (rows < 1)?setRowCount(100):setRowCount(rows);
     (columns < 1)?setColumnCount(6):setColumnCount(columns);
 
     setItemPrototype(new Cell());
-    setSelectionMode(ContiguousSelection);
+    setSelectionMode(ExtendedSelection);
     setContextMenuPolicy(Qt::ActionsContextMenu);
+    this->mng = mng;
 
     refresh_timer = new QTimer(this);
     refresh_timer->start(5000);
@@ -78,6 +82,8 @@ bool SpreadSheet::printSpreadSheet(const QString &fileName) const
             QRect r = QRect(x, y, columnWidth(j)+diff, row_height);
             painter.setBrush(cell(i,j)->background());
             painter.drawRect(r);
+            r.setX(r.x()+2);
+            r.setWidth(r.width()-4);
             painter.setBrush(brush);
             QString text = (!cell(i,j))?"":cell(i,j)->text();
             painter.setFont(!(cell(i,j))?font():cell(i,j)->font());
@@ -95,6 +101,8 @@ bool SpreadSheet::printSpreadSheet(const QString &fileName) const
                 r.setHeight(row_height);
                 painter.setBrush(cell(i,j)->background());
                 painter.drawRect(r);
+                r.setX(r.x()+2);
+                r.setWidth(r.width()-4);
                 painter.setBrush(brush);
                 painter.setPen(cell(i,j)->foreground().color());
                 painter.drawText(r, cell(i,j)->textAlignment() | Qt::TextWrapAnywhere, text);
@@ -109,6 +117,8 @@ bool SpreadSheet::printSpreadSheet(const QString &fileName) const
                     r.setHeight(row_height);
                     painter.setBrush(cell(i,k)->background());
                     painter.drawRect(r);
+                    r.setX(r.x()+2);
+                    r.setWidth(r.width()-4);
                     painter.setBrush(brush);
                     
                     text = (!cell(i,k))?"":cell(i,k)->text();
@@ -146,17 +156,70 @@ QString SpreadSheet::getLocation(int row, int column) const
     return QChar('A' + column) + QString::number(row + 1);
 }
 
+bool SpreadSheet::selectionsEquals(const QMultiMap<int, int> &first, 
+                                   const QMultiMap<int, int> &second)
+{
+    QList<int> firstUniqueKeys = first.uniqueKeys();
+    QList<int> secondUniqueKeys = second.uniqueKeys();
+    if (firstUniqueKeys.size() != secondUniqueKeys.size())
+        return false;
+    
+    QList<int> firstColumnsSize = QList<int>();
+    QListIterator<int> firstIt(firstUniqueKeys);
+    while (firstIt.hasNext())
+        firstColumnsSize.append(first.values(firstIt.next()).size());
+    
+    QList<int> secondColumnsSize = QList<int>();
+    QListIterator<int> secondIt(secondUniqueKeys);
+    while (secondIt.hasNext())
+        secondColumnsSize.append(second.values(secondIt.next()).size());
+    
+    return qEqual(firstColumnsSize.begin(), firstColumnsSize.end(),
+                  secondColumnsSize.begin());
+}
+
 QString SpreadSheet::currentFormula() const
 {
     return formula(currentRow(), currentColumn());
 }
 
-QTableWidgetSelectionRange SpreadSheet::selectedRange() const
+QPair<int,int> SpreadSheet::getLocation(const QString &cellId)
 {
-    QList<QTableWidgetSelectionRange> ranges = selectedRanges();
-    if (ranges.isEmpty())
-        return QTableWidgetSelectionRange();
-    return ranges.first();
+    int column = ((int)(cellId.at(0).toAscii()))-65;
+    int row = (cellId.mid(1).toInt())-1;
+    
+    if (row >= 0)
+        return QPair<int,int>(row, column);
+    else
+        return QPair<int,int>(-1,-1);
+}
+
+QMultiMap<int,int> SpreadSheet::selectedItemIndexes() const
+{
+    QMultiMap<int,int> result = QMultiMap<int,int>();
+    QMultiMap<int,int> aux = QMultiMap<int,int>();
+    
+    QModelIndexList idxs = selectedIndexes();
+    QListIterator<QModelIndex> it(idxs);
+    while (it.hasNext())
+    {
+        QModelIndex idx = it.next();
+        aux.insert(idx.row(), idx.column());
+    }
+    
+    QList<int> rows = aux.uniqueKeys();
+    QListIterator<int> rowsIt(rows);
+    while (rowsIt.hasNext())
+    {
+        int row = rowsIt.next();
+        QList<int> columns = aux.values(row);
+        qSort(columns.begin(), columns.end(), qGreater<int>());
+        QListIterator<int> columnsIt(columns);
+        while (columnsIt.hasNext())
+            result.insert(row, columnsIt.next());
+    }
+    
+    return result;
 }
 
 QTimer *SpreadSheet::getTimer() const
@@ -201,70 +264,61 @@ void SpreadSheet::setCellsSize(const QSize &size)
             setColumnWidth(i, size.width());
 }
 
-void SpreadSheet::setFormula(const QString &formula)
+void SpreadSheet::setFormula(const QString &formula, 
+                             const QMultiMap<int, int> &selection)
 {
-    QTableWidgetSelectionRange range = selectedRange();
-    if (range.columnCount() * range.rowCount() == 0)
-        return;
-    if (range.columnCount() * range.rowCount() == 1)
+    QRegExp pattern("[A-Z][1-9][0-9]*");
+    int pos = 0;
+    QStringList ids = QStringList();
+    QList< QPair<int,int> > positions = QList< QPair<int,int> >();
+    QList <int> ids_pos = QList <int>();
+    while ((pos = formula.indexOf(pattern, pos)) != -1)
     {
-        Cell *c = cell(range.topRow(), range.leftColumn());
-        if (!c)
-        {
-            c = new Cell();
-            setItem(range.topRow(), range.leftColumn(), c);
-        }
-        connect(c, SIGNAL(getLink(QString,int,int,const QTableWidgetItem*)),
-                this, SLOT(emitGetLink(QString,int,int,const QTableWidgetItem*)));
-        connect(c, SIGNAL(invalidFormula(QString)),
-                this, SIGNAL(invalidFormula(QString)));
-        c->setData(Qt::EditRole, formula);
+        QString id = formula.mid(pos, pattern.matchedLength());
+        ids.append(id);
+        ids_pos.append(pos);
+        positions.append(getLocation(id));
+        pos += pattern.matchedLength();
     }
-    else
+
+    QMapIterator<int,int> it(selection);
+    it.next();
+    int firstRow = it.key();
+    int firstColumn = it.value();
+    setFormula(firstRow, firstColumn, formula);
+    while (it.hasNext())
     {
-        int pos = 0;
-        int start_pos = 0;
-        QRegExp pattern("[A-Z][0-9]{1,3}");
-        QStringList matches = QStringList();
-        QList <int> matches_pos = QList <int>();
-        QList <int> matches_len = QList <int>();
-        while ((pos = formula.indexOf(pattern, start_pos)) != -1)
+        it.next();  
+        QString result = formula;
+        for (int i=0; i<ids.length(); i++)
         {
-            start_pos = pos + 1;
-            matches.append(formula.mid(pos, pattern.matchedLength()));
-            matches_pos.append(pos);
-            matches_len.append(pattern.matchedLength());
+            QPair<int,int> position = positions.at(i);
+            QString new_id = getLocation(position.first+it.key()-firstRow, 
+                                         position.second+it.value()-firstColumn);
+            if (!new_id.isEmpty())
+                result.replace(ids_pos.at(i), ids.at(i).length(),
+                               new_id);
         }
+        setFormula(it.key(), it.value(), result);
+    }
+}
 
-        for (int i=0; i<range.rowCount(); i++)
-        {
-            for (int j=0; j<range.columnCount(); j++)
-            {
-                QString f = QString(formula);
-                for (int m=0; m<matches.length(); m++)
-                {
-                    QString id = QString(matches.at(m));
-                    int column = ((int)(id[0].toAscii()))-65;
-                    int row = id.right(id.length()-1).toInt()-1;
-
-                    QString new_id = getLocation(row+i, column+j);
-                    if (new_id.length() > 0)
-                        f.replace(matches_pos.at(m), matches_len.at(m), new_id);
-                }
-
-                Cell *c = cell(range.topRow()+i, range.leftColumn()+j);
-                if (!c)
-                {
-                    c = new Cell();
-                    setItem(range.topRow()+i, range.leftColumn()+j, c);
-                }
-                connect(c, SIGNAL(getLink(QString,int,int,const QTableWidgetItem*)),
-                        this, SLOT(emitGetLink(QString,int,int,const QTableWidgetItem*)));
-                connect(c, SIGNAL(invalidFormula(QString)),
-                        this, SIGNAL(invalidFormula(QString)));
-                c->setData(Qt::EditRole, f);
-            }
-        }
+void SpreadSheet::setFormula(const QString &table, 
+                             const QMultiMap<int, int> &from, 
+                             const QMultiMap<int, int> &to)
+{
+    if (!selectionsEquals(from, to))
+        return;
+    
+    QMapIterator<int,int> fromIt(from), toIt(to);
+    while (fromIt.hasNext() && toIt.hasNext())
+    {
+        fromIt.next();
+        toIt.next();
+        
+        QString link = QString("=%1:%2").arg(table).
+                arg(getLocation(fromIt.key(), fromIt.value()));
+        setFormula(toIt.key(), toIt.value(), link);
     }
 }
 
@@ -321,7 +375,36 @@ QFont SpreadSheet::currentFont() const
     if (!item)
         return QApplication::font();
     
-    return item->font();
+    QVariant aux = item->data(Qt::FontRole);
+    if (aux.canConvert<QFont>())
+        return aux.value<QFont>();
+    else
+        return QApplication::font();
+}
+
+QString SpreadSheet::getLinkData(const QString &formula,
+                    const QHash<QString,QString> &matches) const
+{
+    if (mng)
+    {
+        QHash<QString,QString> values = mng->getLinkData(matches);
+        QString result = formula;
+        QHashIterator<QString,QString> it(values);
+        while (it.hasNext())
+        {
+            it.next();
+            result.replace(it.key(), it.value());
+        }
+        QString val;
+        QFont f;
+        QBrush b;
+        QByteArray cellData = QCA::hexToArray(result);
+        QDataStream in(&cellData, QIODevice::ReadOnly);
+        in >> f >> b >> b >> val;
+        return val;
+    }
+    else
+        return "#####";
 }
 
 void SpreadSheet::clear()
@@ -378,17 +461,19 @@ QString SpreadSheet::formula(int row, int column) const
 void SpreadSheet::setFormula(int row, int column,
                              const QString &formula)
 {
+    if (row >= rowCount() || column >= columnCount())
+        return;
+    
     Cell *c = cell(row, column);
     if (!c)
     {
         c = new Cell();
         setItem(row, column, c);
     }
-    connect(c, SIGNAL(getLink(QString,int,int,const QTableWidgetItem*)),
-            this, SLOT(emitGetLink(QString,int,int,const QTableWidgetItem*)));
     connect(c, SIGNAL(invalidFormula(QString)),
             this, SIGNAL(invalidFormula(QString)));
     c->setData(Qt::EditRole, formula);
+    somethingChanged(c);
 }
 
 void SpreadSheet::cut()
@@ -399,17 +484,29 @@ void SpreadSheet::cut()
 
 void SpreadSheet::copy()
 {
-    QTableWidgetSelectionRange range = selectedRange();
-    QString str;
-
-    for (int i=0; i<range.rowCount(); i++)
+    QMultiMap<int,int> range = selectedItemIndexes();
+    QList<int> rows = range.uniqueKeys();
+    QString str = "";
+    
+    QList<int> cols = range.values();
+    qSort(cols);
+    int firstCol = cols.first(), lastCol = cols.last();
+    
+    for (int i=rows.first(); i<=rows.last(); i++)
     {
-        for (int j=0; j<range.columnCount(); j++)
+        if (rows.contains(i))
         {
-            str += formula(range.topRow()+i, range.leftColumn()+j);
-            str += "\t";
+            QList<int> columns = range.values(i);
+            qSort(columns);
+            
+            for (int j=firstCol; j<=lastCol; j++)
+            {
+                if (columns.contains(j))
+                    str += formula(i, j);
+                str += "\t";
+            }
+            str.chop(1);
         }
-        str.chop(1);
         str += "\n";
     }
     str.chop(1);
@@ -418,33 +515,25 @@ void SpreadSheet::copy()
 
 void SpreadSheet::paste()
 {
-    QTableWidgetSelectionRange range = selectedRange();
+    QMultiMap<int,int> range = selectedItemIndexes();
+    QMapIterator<int,int> it(range);
+    it.next();
+    int firstRow = it.key(), firstCol = it.value();
+    
     QString str = QApplication::clipboard()->text();
     QStringList rows = str.split('\n');
-    int numRows = rows.count();
-    int numColumns = rows.first().count('\t') + 1;
-
-    if (range.rowCount() * range.columnCount() != 1
-            && (range.rowCount() != numRows
-                || range.columnCount() != numColumns))
+    int numRows = rows.size();
+    for (int r=0; r<numRows; r++)
     {
-        QMessageBox::information(this, tr("SpreadSheet"),
-                tr("Invalid size"));
-        return;
-    }
-
-    for (int i=0; i<numRows; i++)
-    {
-        QStringList columns = rows[i].split('\t');
-        for (int j=0; j<numColumns; j++)
+        QStringList columnData = rows.at(r).split('\t');
+        int numColumns = columnData.size();
+        for (int c=0; c<numColumns; c++)
         {
-            int row = range.topRow() + i;
-            int column = range.leftColumn() + j;
-            if (row < rowCount() && column < columnCount())
-                setFormula(row, column, columns[j]);
+            int destRow = firstRow+r, destCol = firstCol+c;
+            if (range.contains(destRow, destCol))
+                setFormula(destRow, destCol, columnData.at(c));
         }
     }
-    somethingChanged(currentItem());
 }
 
 void SpreadSheet::del()
@@ -456,6 +545,23 @@ void SpreadSheet::del()
             if (items[i] != 0)
                 items[i]->setData(Qt::EditRole, "");
         somethingChanged(currentItem());
+    }
+}
+
+void SpreadSheet::setSelectedItemIndexes(const QMultiMap<int, int> &items)
+{
+    clearSelection();
+    QMapIterator<int, int> it(items);
+    while (it.hasNext())
+    {
+        it.next();
+        Cell *c = cell(it.key(), it.value());
+        if (!c)
+        {
+            c = new Cell();
+            setItem(it.key(), it.value(), c);
+        }
+        c->setSelected(true);
     }
 }
 
@@ -609,6 +715,11 @@ void SpreadSheet::setSize(int rows, int columns)
     setColumnCount(columns);
 }
 
+void SpreadSheet::emitSelectionChanged()
+{
+    emit itemSelectionChanged(selectedItemIndexes());
+}
+
 void SpreadSheet::somethingChanged(QTableWidgetItem *cell)
 {
     if (cell == 0)
@@ -622,8 +733,8 @@ void SpreadSheet::somethingChanged(QTableWidgetItem *cell)
            cell->data(Qt::EditRole).toString();
     
     QString aux = QString("%1\n%2\n%3").
-                    arg(cell->row()).
-                    arg(cell->column()).
+                    arg(row(cell)).
+                    arg(column(cell)).
                     arg(QCA::arrayToHex(cellData));
     emit modified(aux);
 }
@@ -646,8 +757,13 @@ void SpreadSheet::loadData(const QMap<int, QString> &data)
             QDataStream in(&cellData, QIODevice::ReadOnly);
             in >> font >> foreground >> background >> formula;
                     
-            setFormula(it.key(), c, formula);
-            QTableWidgetItem *item = this->item(it.key(), c);
+            Cell *item = cell(it.key(), c);
+            if (!item)
+            {
+                item = new Cell();
+                setItem(it.key(), c, item);
+            }
+            item->setData(Qt::EditRole, formula);
             item->setFont(font);
             item->setForeground(foreground);
             item->setBackground(background);
@@ -655,22 +771,31 @@ void SpreadSheet::loadData(const QMap<int, QString> &data)
     }
 }
 
-void SpreadSheet::emitGetLink(const QString &table, int r,
-                 int c, const QTableWidgetItem* cell)
-{
-    emit getLink(table, r, c, row(cell), column(cell));
-}
-
 void SpreadSheet::currentSelectionChanged()
 {
+    QFont f = QApplication::font();
+    QBrush back = QBrush(Qt::white);
+    QBrush fore = QBrush(Qt::black);
+    
     QTableWidgetItem *item = currentItem();
-    if (!item)
-        emit currentSelectionChanged(QApplication::font(), QBrush(Qt::white),
-                                     QBrush(Qt::black));
-    else if (item->font().family() == "")
-        emit currentSelectionChanged(QApplication::font(), QBrush(Qt::white),
-                                     QBrush(Qt::black));
-    else
-        emit currentSelectionChanged(item->font(), item->background(),
-                                     item->foreground());
+    if (item)
+    {
+        QVariant aux = item->data(Qt::FontRole);
+        if (aux.canConvert<QFont>())
+            f = aux.value<QFont>();
+        
+        aux = item->data(Qt::BackgroundRole);
+        if (aux.canConvert<QBrush>())
+            back = aux.value<QBrush>();
+        if (!back.color().isValid())
+            back = QBrush(Qt::white);
+        
+        aux = item->data(Qt::ForegroundRole);
+        if (aux.canConvert<QBrush>())
+            fore = aux.value<QBrush>();
+        if (!fore.color().isValid())
+            fore = QBrush(Qt::black);
+    }
+
+    emit currentSelectionChanged(f, back, fore);
 }

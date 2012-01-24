@@ -115,11 +115,13 @@ private slots:
     void createConfigureAppDialog();
     void createImportDataDialog();
     void createFormulaDialog();
-    void createLoginDialog();
+    //void createLoginDialog();
     void createDBLoginDialog();
-    void createSignInDialog();
+    //void createSignInDialog();
     void resizeWindow(int cells);
-    void initializeDatabase(const QString &err);
+    void initializeDatabase(const QString &username,
+                            const QString &password, 
+                            const QString &err);
     void displayError(const QString &message);
     void clearErrorMessage();
     void displayCurrentCellSettings(const QFont &font, 
