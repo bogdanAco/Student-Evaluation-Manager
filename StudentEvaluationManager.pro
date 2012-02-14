@@ -7,7 +7,7 @@
 QT       += core gui \
             sql xml
 
-CONFIG += release
+CONFIG += release crypto
 
 TARGET = StudentEvaluationManager
 TEMPLATE = app
@@ -33,13 +33,13 @@ HEADERS  += MainWindow.h \
     TableDialog.h \
     ConfigurationDialog.h
 
-#INCLUDEPATH += $$quote(qca-2.0.3\include\QtCrypto)
-INCLUDEPATH += $$quote(G:\facultate\Licenta\StudentEvaluationManager-build-desktop\qca-2.0.3\include\QtCrypto)
+INCLUDEPATH += $$quote(qca-2.0.3/include/QtCrypto)
+#INCLUDEPATH += $$quote(G:\facultate\Licenta\StudentEvaluationManager-build-desktop\qca-2.0.3\include\QtCrypto)
 
 win32 {
     LIBS += -L$$quote(qca-2.0.3/lib) -lqca2
 }
 
 unix {
-    LIBS += -L$$quote(qca-2.0.3/lib) -lqca2
+    LIBS += -L$$quote(qca-2.0.3/lib) -lqca
 }

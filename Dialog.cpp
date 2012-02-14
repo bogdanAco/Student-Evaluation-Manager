@@ -146,11 +146,11 @@ void GrantRightsDialog::grantRights()
 UserLoginDialog::UserLoginDialog(QWidget *parent) :
         Dialog("User login", "Username", parent)
 {
-    usrnm = new QLineEdit("bau", this);
+    usrnm = new QLineEdit(this);
     mainLayout->addWidget(usrnm, 4, 0, 1, 4);
     password = new QLabel("Password:",this);
     mainLayout->addWidget(password, 5, 0, 1, 4);
-    passwd = new QLineEdit("Rainbow0745@", this);
+    passwd = new QLineEdit(this);
     passwd->setEchoMode(QLineEdit::Password);
     mainLayout->addWidget(passwd, 6, 0, 1, 4);
     usrnm->setFocus();

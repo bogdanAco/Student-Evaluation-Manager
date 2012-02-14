@@ -91,6 +91,8 @@ bool SpreadSheet::printSpreadSheet(const QString &fileName) const
             painter.drawText(r, cell(i,j)->textAlignment() | Qt::TextWrapAnywhere,
                              text, &required);
             painter.setPen(pen.color());
+            r.setX(r.x()-2);
+            r.setWidth(r.width()+4);
             
             if (required.height() > r.height())
             {

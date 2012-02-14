@@ -268,14 +268,12 @@ bool DBManager::writeData(int line, int column, const QString& cell_data)
                         arg(*current_table).arg(column).arg(line).
                         arg(timestamp).arg(spreadsheet->rowHeight(line)).
                         arg(dataToWrite);
-        qDebug() << q;
         
         if (!query->exec(q))
         {
             emit queryError("Please check your database connection");
             return false;
         }
-        qDebug() << q;
         spreadsheet->addTimestamp(line, timestamp);
         return true;
     }
