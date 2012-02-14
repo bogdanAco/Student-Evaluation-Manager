@@ -34,12 +34,13 @@ HEADERS  += MainWindow.h \
     ConfigurationDialog.h
 
 INCLUDEPATH += $$quote(qca-2.0.3/include/QtCrypto)
-#INCLUDEPATH += $$quote(G:\facultate\Licenta\StudentEvaluationManager-build-desktop\qca-2.0.3\include\QtCrypto)
+
+unix {
+    QMAKE_LFLAGS += -Wl,--rpath=\\\$\$ORIGIN
+    QMAKE_LFLAGS_RPATH =
+    LIBS += -L$$quote(qca-2.0.3/lib) -lqca
+}
 
 win32 {
     LIBS += -L$$quote(qca-2.0.3/lib) -lqca2
-}
-
-unix {
-    LIBS += -L$$quote(qca-2.0.3/lib) -lqca
 }
